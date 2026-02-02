@@ -50,5 +50,15 @@ THEMES = {
         "font_family": "Segoe UI, Ubuntu, Sans-Serif",
         "title_font_size": 20,
         "text_font_size": 14
+    },
+    "Neural": {
+    "bg_color": "#0a0f14",        
+    "border_color": "#1f6feb",    
+    "title_color": "#00e5ff",    
+    "text_color": "#9be7ff",      
+    "icon_color": "#00bcd4",      
+    "font_family": "'Consolas', 'Lucida Console', monospace",
+    "title_font_size": 19,
+    "text_font_size": 14
     }
 }

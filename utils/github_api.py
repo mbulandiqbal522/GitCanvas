@@ -1,4 +1,74 @@
 import requests
+import os
+
+GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
+
+
+
+def fetch_github_graphql(username):
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        return None
+
+    query = """
+    query ($login: String!) {
+      user(login: $login) {
+        contributionsCollection {
+          totalCommitContributions
+          contributionCalendar {
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    resp = requests.post(
+        GITHUB_GRAPHQL_URL,
+        json={"query": query, "variables": {"login": username}},
+        headers=headers,
+        timeout=10
+    )
+
+    if resp.status_code != 200:
+        return None
+    
+
+    return resp.json()
+
+def parse_graphql_contributions(graphql_json):
+    weeks = (
+        graphql_json["data"]["user"]
+        ["contributionsCollection"]
+        ["contributionCalendar"]
+        ["weeks"]
+    )
+
+    contributions = []
+    for week in weeks:
+        for day in week["contributionDays"]:
+            contributions.append({
+                "date": day["date"],
+                "count": day["contributionCount"]
+            })
+
+    total_commits = (
+        graphql_json["data"]["user"]
+        ["contributionsCollection"]
+        ["totalCommitContributions"]
+    )
+
+    return contributions, total_commits
+
 
 def get_live_github_data(username):
     """
@@ -32,8 +102,10 @@ def get_live_github_data(username):
         
         top_langs = sorted(languages.items(), key=lambda x: x[1], reverse=True)[:5]
         
+
         # Ensure total_commits is always an integer
         total_commits = 0 
+
         try:
             contrib_url = f"https://github-contributions-api.jogruber.de/v4/{username}"
             contrib_resp = requests.get(contrib_url)
@@ -47,14 +119,27 @@ def get_live_github_data(username):
             print(f"Contrib API Error: {ex}")
             total_commits = 0 # Safety fallback
 
-        return {
+        data = {
             "username": username,
             "total_stars": total_stars,
             "total_commits": total_commits,
             "public_repos": user_data.get("public_repos", 0),
             "followers": user_data.get("followers", 0),
-            "top_languages": top_langs
+            "top_languages": top_langs,
         }
+
+        # --- Optional GraphQL enrichment ---
+        graphql_data = fetch_github_graphql(username)
+        if graphql_data:
+            try:
+                contributions, gql_total_commits = parse_graphql_contributions(graphql_data)
+                data["contributions"] = contributions
+                data["total_commits"] = gql_total_commits
+            except Exception:
+                pass  # Never break REST fallback
+
+        return data
+
             
     except Exception as e:
         print(f"Error: {e}")
@@ -68,5 +153,10 @@ def get_mock_data(username):
         "total_commits": 450,
         "public_repos": 25,
         "followers": 85,
-        "top_languages": [("Python", 10), ("JavaScript", 5), ("Rust", 2)]
+        "top_languages": [("Python", 10), ("JavaScript", 5), ("Rust", 2)],
+        "contributions":[ 
+            {"date": f"2025-01-{i+1:02d}", "count": (i * 3) % 10}
+            for i in range(80)
+        ]
+
     }
