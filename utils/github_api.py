@@ -1,4 +1,21 @@
 import requests
+import os
+
+
+def get_github_headers():
+    """
+    Build headers for GitHub REST API requests.
+    Uses Authorization header if GITHUB_TOKEN is set.
+    """
+    headers = {
+        "Accept": "application/vnd.github+json"
+    }
+
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    return headers
 
 def get_live_github_data(username):
     """
@@ -11,14 +28,16 @@ def get_live_github_data(username):
     try:
         # User details
         user_url = f"https://api.github.com/users/{username}"
-        user_resp = requests.get(user_url)
+        headers = get_github_headers()
+        user_resp = requests.get(user_url, headers=headers)
+
         if user_resp.status_code != 200:
             return None
         user_data = user_resp.json()
         
         # Repos for stars count (limited to first 100 public repos for basic sum without pagination for MVP speed)
         repos_url = f"https://api.github.com/users/{username}/repos?per_page=100&type=owner"
-        repos_resp = requests.get(repos_url)
+        repos_resp = requests.get(repos_url, headers=headers)
         repos_data = repos_resp.json() if repos_resp.status_code == 200 else []
         
         total_stars = sum(repo.get("stargazers_count", 0) for repo in repos_data)
