@@ -101,93 +101,68 @@ def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
     st.text_area(label, value=code_content, height=100, label_visibility="collapsed")
 
-with tab1:
+def render_tab(svg_bytes, endpoint, username, selected_theme, custom_colors, hide_params=None, code_template=None):
     col1, col2 = st.columns([1.5, 1])
     with col1:
-        st.subheader("Stats Card")
-        # Options
-        c1, c2, c3, c4 = st.columns(4)
-        show_stars = c1.checkbox("Stars", True)
-        show_commits = c2.checkbox("Commits", True)
-        show_repos = c3.checkbox("Repos", True)
-        show_followers = c4.checkbox("Followers", True)
-        
-        show_ops = {"stars": show_stars, "commits": show_commits, "repos": show_repos, "followers": show_followers}
-        
-        # Render
-        svg_bytes = stats_card.draw_stats_card(data, selected_theme, show_ops, custom_colors)
+        # Render SVG
         b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
         st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
-        
+
     with col2:
         st.subheader("Integration")
         # Construct URL
         params = []
-        if not show_stars: params.append("hide_stars=true")
-        if not show_commits: params.append("hide_commits=true")
-        if not show_repos: params.append("hide_repos=true")
-        if not show_followers: params.append("hide_followers=true")
-        
-        if selected_theme != "Default": params.append(f"theme={selected_theme}")
+        if hide_params:
+            for key, value in hide_params.items():
+                if not value:
+                    params.append(f"hide_{key}=true")
+
+        if selected_theme != "Default":
+            params.append(f"theme={selected_theme}")
         for k, v in custom_colors.items():
             params.append(f"{k}={v.replace('#', '')}")
 
         query_str = "&".join(params)
-        if query_str: query_str = "?" + query_str
-        
-        url = f"https://gitcanvas-api.vercel.app/api/stats{query_str}&username={username}"
-        code = f"[![{username}'s Stats]({url})](https://github.com/{username})"
-        
+        if query_str:
+            query_str = "?" + query_str
+
+        url = f"https://gitcanvas-api.vercel.app/api/{endpoint}{query_str}&username={username}"
+        if code_template:
+            code = code_template.format(url=url, username=username)
+        else:
+            code = f"![{endpoint.title()}]({url})"
+
         show_code_area(code)
+
+with tab1:
+    st.subheader("Stats Card")
+    # Options
+    c1, c2, c3, c4 = st.columns(4)
+    show_stars = c1.checkbox("Stars", True)
+    show_commits = c2.checkbox("Commits", True)
+    show_repos = c3.checkbox("Repos", True)
+    show_followers = c4.checkbox("Followers", True)
+
+    show_ops = {"stars": show_stars, "commits": show_commits, "repos": show_repos, "followers": show_followers}
+
+    # Render
+    svg_bytes = stats_card.draw_stats_card(data, selected_theme, show_ops, custom_colors)
+    render_tab(svg_bytes, "stats", username, selected_theme, custom_colors, hide_params=show_ops, code_template=f"[![{username}'s Stats]({{url}})](https://github.com/{{username}})")
 
 with tab2:
-    col1, col2 = st.columns([1.5, 1])
-    with col1:
-        st.subheader("Top Languages")
-        svg_bytes = lang_card.draw_lang_card(data, selected_theme, custom_colors)
-        b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
-        st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
-
-    with col2:
-        st.subheader("Integration")
-        params = []
-        if selected_theme != "Default": params.append(f"theme={selected_theme}")
-        for k, v in custom_colors.items():
-            params.append(f"{k}={v.replace('#', '')}")
-            
-        query_str = "&".join(params)
-        if query_str: query_str = "?" + query_str
-        
-        url = f"https://gitcanvas-api.vercel.app/api/languages{query_str}&username={username}"
-        code = f"![Top Langs]({url})"
-        show_code_area(code)
+    st.subheader("Top Languages")
+    svg_bytes = lang_card.draw_lang_card(data, selected_theme, custom_colors)
+    render_tab(svg_bytes, "languages", username, selected_theme, custom_colors, code_template="![Top Langs]({url})")
 
 with tab3:
-    col1, col2 = st.columns([1.5, 1])
-    with col1:
-        st.subheader("Contribution Graph")
-        st.caption(f"Theme: **{selected_theme}**")
-        if selected_theme == "Gaming": st.caption("🐍 Snake Mode: The snake grows as it eats commits.")
-        elif selected_theme == "Space": st.caption("🚀 Space Mode: Spaceship traversing the contribution galaxy.")
-        elif selected_theme == "Marvel": st.caption("💎 Infinity Mode: Collecting Stones based on activity.")
-        
-        svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
-        b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
-        st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
+    st.subheader("Contribution Graph")
+    st.caption(f"Theme: **{selected_theme}**")
+    if selected_theme == "Gaming": st.caption("🐍 Snake Mode: The snake grows as it eats commits.")
+    elif selected_theme == "Space": st.caption("🚀 Space Mode: Spaceship traversing the contribution galaxy.")
+    elif selected_theme == "Marvel": st.caption("💎 Infinity Mode: Collecting Stones based on activity.")
 
-    with col2:
-        st.subheader("Integration")
-        params = []
-        if selected_theme != "Default": params.append(f"theme={selected_theme}")
-        for k, v in custom_colors.items():
-            params.append(f"{k}={v.replace('#', '')}")
-            
-        query_str = "&".join(params)
-        if query_str: query_str = "?" + query_str
-        
-        url = f"https://gitcanvas-api.vercel.app/api/contributions{query_str}&username={username}"
-        code = f"![Contributions]({url})"
-        show_code_area(code)
+    svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
+    render_tab(svg_bytes, "contributions", username, selected_theme, custom_colors, code_template="![Contributions]({url})")
 
 with tab4:
     st.subheader("Tech Stack Badges")
