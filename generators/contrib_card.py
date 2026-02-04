@@ -15,8 +15,13 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     # In a real scenario, data['contributions'] would have the last ~15-30 days or weeks
     # For MVP we simulate a strip of activity
     
-    width = 500
-    height = 150
+    # Allow a slightly larger playground for Gaming / Snake
+    if theme_name == "Gaming":
+        width = 560
+        height = 180
+    else:
+        width = 500
+        height = 150
     dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
     
     # Background
@@ -32,40 +37,143 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     # Theme Specific Logic
     
     if theme_name == "Gaming":
-        # SNAKE Logic: A winding path of green blocks
-        # "Eating my contributions" -> The snake head is at the last commit
-        
-        grid_size = 15
-        start_x = 20
-        start_y = 50
-        
-        # Draw a simple grid path (Snake body) taking up space
-        dwg.add(dwg.text(f"SCORE: {data.get('total_commits', '0')}", insert=(width-120, 30),
-                         fill=theme["text_color"], font_family="Courier New", font_size=16, font_weight="bold"))
-        
-        # Draw Food (Contributions) randomly placed
-        # Red pixel apples
-        for i in range(8):
-             fx = random.randint(2, 28) * (grid_size+2) + start_x
-             fy = random.randint(1, 5) * (grid_size+2) + start_y
-             if fy > height - 20: fy = height - 20
-             dwg.add(dwg.rect(insert=(fx, fy), size=(grid_size, grid_size), fill="#FF3333", rx=2, ry=2)) # Apple
+        # Data‑driven SNAKE Logic for the Gaming theme
+        # - 8‑bit style grid.
+        # - Each day is a tile; days with commits are "food".
+        # - Snake path visits highest‑commit tiles first.
 
-        # Draw Snake Body - Green path
-        # Simulating a snake that has grown long
-        segments = [(start_x + i*(grid_size+2), start_y + (grid_size+2)*2) for i in range(10)]
-        # Turn
-        segments.extend([(start_x + 9*(grid_size+2), start_y + (grid_size+2)*j) for j in range(3, 5)])
-        
-        for px, py in segments:
-            dwg.add(dwg.rect(insert=(px, py), size=(grid_size, grid_size), fill=theme["icon_color"], rx=2, ry=2))
-            
-        # Head
-        hx, hy = segments[-1]
-        dwg.add(dwg.rect(insert=(hx, hy), size=(grid_size, grid_size), fill=theme["title_color"])) 
-        # Eyes
-        dwg.add(dwg.rect(insert=(hx+3, hy+3), size=(3, 3), fill="black"))
-        dwg.add(dwg.rect(insert=(hx+9, hy+3), size=(3, 3), fill="black"))
+        contributions = data.get("contributions", []) or []
+        # Use at most last 196 days to fit nicely in 28x7 grid
+        contributions = contributions[-196:]
+
+        tile_size = 12
+        gap = 2
+        cols = 28
+        rows = 7
+
+        start_x = 20
+        start_y = 55
+
+        # Retro HUD / score
+        dwg.add(
+            dwg.text(
+                f"SCORE: {data.get('total_commits', '0')}",
+                insert=(width - 150, 30),
+                fill=theme["text_color"],
+                font_family="Courier New",
+                font_size=14,
+                font_weight="bold",
+            )
+        )
+
+        # Build grid cells mapped from contributions.
+        # If there is no contribution data, we still render an empty grid
+        # so the card never looks blank.
+        cells = []
+        if contributions:
+            for idx, day in enumerate(contributions):
+                col = idx // rows
+                row = idx % rows
+                if col >= cols:
+                    break
+
+                x = start_x + col * (tile_size + gap)
+                y = start_y + row * (tile_size + gap)
+                count = day.get("count", 0)
+                cells.append({"x": x, "y": y, "count": count})
+        else:
+            for col in range(cols):
+                for row in range(rows):
+                    x = start_x + col * (tile_size + gap)
+                    y = start_y + row * (tile_size + gap)
+                    cells.append({"x": x, "y": y, "count": 0})
+
+        # Draw base tiles + food tiles
+        for cell in cells:
+            # Base "ground" tile
+            base_color = "#1e293b"  # slightly lighter dark blue ground
+            fill = base_color
+
+            if cell["count"] > 0:
+                # Food / grass intensity by commits
+                if cell["count"] < 3:
+                    fill = "#2e7d32"
+                elif cell["count"] < 7:
+                    fill = "#43a047"
+                else:
+                    fill = "#81c784"
+
+            dwg.add(
+                dwg.rect(
+                    insert=(cell["x"], cell["y"]),
+                    size=(tile_size, tile_size),
+                    fill=fill,
+                    rx=1,
+                    ry=1,
+                )
+            )
+
+        # Build snake path over the grid using commit data
+        food_cells = [c for c in cells if c["count"] > 0]
+        # Sort by commit count descending so snake eats "biggest" days first
+        food_cells.sort(key=lambda c: c["count"], reverse=True)
+
+        if food_cells:
+            # Limit snake length so it doesn't cover everything
+            max_segments = min(25, len(food_cells))
+            ordered = food_cells[:max_segments]
+
+            snake_segments = [(cell["x"], cell["y"]) for cell in ordered]
+        else:
+            # Fallback: simple zig‑zag snake across the center row
+            center_row = rows // 2
+            snake_segments = []
+            for col in range(min(18, cols)):
+                x = start_x + col * (tile_size + gap)
+                y = start_y + center_row * (tile_size + gap)
+                snake_segments.append((x, y))
+
+        if snake_segments:
+            # Draw snake body segments (all but head)
+            for sx, sy in snake_segments[:-1]:
+                dwg.add(
+                    dwg.rect(
+                        insert=(sx, sy),
+                        size=(tile_size, tile_size),
+                        fill=theme["icon_color"],
+                        rx=2,
+                        ry=2,
+                    )
+                )
+
+            # Snake head = last segment
+            hx, hy = snake_segments[-1]
+            dwg.add(
+                dwg.rect(
+                    insert=(hx, hy),
+                    size=(tile_size, tile_size),
+                    fill=theme["title_color"],
+                    rx=2,
+                    ry=2,
+                )
+            )
+
+            # Pixel eyes on the head
+            eye = 2
+            dwg.add(
+                dwg.rect(
+                    insert=(hx + 2, hy + 2),
+                    size=(eye, eye),
+                    fill="black",
+                )
+            )
+            dwg.add(
+                dwg.rect(
+                    insert=(hx + tile_size - eye - 2, hy + 2),
+                    size=(eye, eye),
+                    fill="black",
+                )
+            )
 
     elif theme_name == "Space":
         # Spaceship logic
