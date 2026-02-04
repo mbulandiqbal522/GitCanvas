@@ -17,7 +17,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     
     width = 500
     height = 150
-    dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
+    dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
     
     # Background
     dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=10, ry=10, 
@@ -70,14 +70,34 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     elif theme_name == "Space":
         # Spaceship logic
         # Commits are stars.
-        
-        # Draw random stars
-        for _ in range(30):
-            sx = random.randint(20, width-20)
-            sy = random.randint(50, height-20)
+        dwg.defs.add(dwg.style("""
+            @keyframes twinkle {
+            0%   { opacity: 0.3; }
+            50%  { opacity: 1; }
+            100% { opacity: 0.3; }
+            }
+
+            .star {
+            animation: twinkle 2s ease-in-out infinite;
+            }
+            """))
+
+        for i in range(30):
+            sx = random.randint(20, width - 20)
+            sy = random.randint(50, height - 20)
             r = random.uniform(1, 3)
-            dwg.add(dwg.circle(center=(sx, sy), r=r, fill="white", opacity=random.uniform(0.5, 1.0)))
-            
+            delay = random.uniform(0, 2)
+
+            star = dwg.circle(
+                center=(sx, sy),
+                r=r,
+                fill="white",
+                class_="star",
+                style=f"animation-delay: {delay}s"
+            )
+
+            dwg.add(star)
+
         # Draw Spaceship (Simple triangle)
         ship_x = width - 60
         ship_y = height / 2 + 10
