@@ -113,6 +113,115 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             
         dwg.add(dwg.text("SNAP!", insert=(width-80, cy), fill=theme["title_color"], font_size=24, font_weight="bold", font_family="Impact"))
 
+    elif theme_name == "Glass":
+        # Glassmorphism contribution panel
+
+        # Override the simple solid background with a subtle gradient
+        bg_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="glassBg")
+        bg_grad.add_stop_color(0, "#0f172a")
+        bg_grad.add_stop_color(1, "#020617")
+        dwg.defs.add(bg_grad)
+
+        # Full-card background
+        dwg.add(
+            dwg.rect(
+                insert=(0, 0),
+                size=("100%", "100%"),
+                rx=10,
+                ry=10,
+                fill="url(#glassBg)"
+            )
+        )
+
+        # Glass blur filter
+        glass_filter = dwg.filter(
+            id="glassBlur",
+            x="-20%",
+            y="-20%",
+            width="140%",
+            height="140%"
+        )
+        glass_filter.feGaussianBlur(in_="SourceGraphic", stdDeviation=8)
+        glass_filter.feColorMatrix(
+            type="matrix",
+            values=(
+                "1 0 0 0 0 "
+                "0 1 0 0 0 "
+                "0 0 1 0 0 "
+                "0 0 0 0.7 0"
+            ),
+        )
+        dwg.defs.add(glass_filter)
+
+        # Translucent glass panel
+        panel = dwg.rect(
+            insert=(20, 35),
+            size=(width - 40, height - 60),
+            rx=18,
+            ry=18,
+            fill="#ffffff",
+            fill_opacity=0.12,
+            stroke=theme["border_color"],
+            stroke_width=1.5,
+        )
+        panel["filter"] = "url(#glassBlur)"
+        dwg.add(panel)
+
+        # Title on top of panel
+        dwg.add(
+            dwg.text(
+                title,
+                insert=(40, 60),
+                fill=theme["title_color"],
+                font_size=theme["title_font_size"],
+                font_family=theme["font_family"],
+                font_weight="bold",
+            )
+        )
+
+        # Contributions rendered as soft glass bubbles
+        contributions = data.get("contributions", [])
+        x = 50
+        y = 90
+        max_x = width - 60
+
+        for day in contributions:
+            count = day.get("count", 0)
+
+            if count == 0:
+                # empty day: tiny faint dot
+                r = 2
+                opacity = 0.15
+            else:
+                r = min(3 + count * 0.7, 9)
+                opacity = min(0.25 + count * 0.07, 0.9)
+
+            # Base bubble
+            dwg.add(
+                dwg.circle(
+                    center=(x, y),
+                    r=r,
+                    fill="#e5f4ff",
+                    fill_opacity=opacity,
+                )
+            )
+
+            # Highlight to enhance glassy feel (only for non-zero days)
+            if count > 0:
+                dwg.add(
+                    dwg.circle(
+                        center=(x - r * 0.3, y - r * 0.3),
+                        r=r * 0.4,
+                        fill="#ffffff",
+                        fill_opacity=0.4,
+                    )
+                )
+
+            x += 22
+            if x > max_x:
+                x = 50
+                y += 22
+
     else:
         # Default Grid (Github Style)
         # Just simple squares
