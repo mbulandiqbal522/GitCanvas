@@ -3,7 +3,7 @@ import base64
 import os
 from dotenv import load_dotenv  # type: ignore
 from roast_widget_streamlit import render_roast_widget  # type: ignore
-from generators import stats_card, lang_card, contrib_card, badge_generator  # type: ignore
+from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card  # type: ignore
 from utils import github_api  # type: ignore
 from themes.styles import THEMES  # type: ignore
 
@@ -77,6 +77,7 @@ with st.sidebar:
 
     if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
+    github_token = st.text_input("GitHub Token (optional)", type="password")
         
     st.info("💡 Tip: Use the 'Badges' tab to add your tech stack icons!")
 
@@ -97,7 +98,7 @@ if custom_colors:
     current_theme_opts.update(custom_colors)
 
 # --- Layout: Tabs ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity"])
 
 def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
@@ -269,3 +270,35 @@ with tab5:
         render_roast_widget(username)
     else:
         st.warning("Please enter a GitHub username in the sidebar.")
+
+with tab6:
+    st.subheader("Recent Activity")
+    st.markdown("Shows your last 3 PR or Issue events from GitHub.")
+
+    col1, col2 = st.columns([1.5, 1])
+    with col1:
+        st.caption("Theme: **{}**".format(selected_theme))
+        try:
+            svg_bytes = recent_activity_card.draw_recent_activity_card({'username': username}, selected_theme, custom_colors, token=github_token)
+        except Exception as e:
+            st.error(f"Error rendering recent activity: {e}")
+            svg_bytes = recent_activity_card._render_svg_lines([f"Error: {e}"], THEMES.get(selected_theme, THEMES['Default']))
+
+        b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
+        st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
+
+    with col2:
+        st.subheader("Integration")
+        params = []
+        if selected_theme != "Default": params.append(f"theme={selected_theme}")
+        for k, v in custom_colors.items():
+            params.append(f"{k}={v.replace('#', '')}")
+        if github_token:
+            params.append(f"token={github_token}")
+
+        query_str = "&".join(params)
+        if query_str: query_str = "?" + query_str
+
+        url = f"https://gitcanvas-api.vercel.app/api/recent{query_str}&username={username}"
+        code = f"![Recent Activity]({url})"
+        show_code_area(code)
