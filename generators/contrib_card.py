@@ -88,7 +88,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
                     y = start_y + row * (tile_size + gap)
                     cells.append({"x": x, "y": y, "count": 0})
 
-        # Draw base tiles + food tiles
+        # Draw base tiles + contribution tiles
         for cell in cells:
             # Base "ground" tile
             base_color = "#1e293b"  # slightly lighter dark blue ground
@@ -113,25 +113,47 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
                 )
             )
 
-        # Build snake path over the grid using commit data
+        # Build snake path and food tiles over the grid using commit data
         food_cells = [c for c in cells if c["count"] > 0]
         # Sort by commit count descending so snake eats "biggest" days first
         food_cells.sort(key=lambda c: c["count"], reverse=True)
 
-        if food_cells:
-            # Limit snake length so it doesn't cover everything
-            max_segments = min(25, len(food_cells))
-            ordered = food_cells[:max_segments]
+        snake_segments = []
+        remaining_food = []
 
-            snake_segments = [(cell["x"], cell["y"]) for cell in ordered]
+        if food_cells:
+            # Use a subset of the richest days for the snake body
+            max_segments = min(18, len(food_cells))
+            snake_cells = food_cells[:max_segments]
+            remaining_food = food_cells[max_segments:]
+            snake_segments = [(cell["x"], cell["y"]) for cell in snake_cells]
         else:
             # Fallback: simple zig‑zag snake across the center row
             center_row = rows // 2
-            snake_segments = []
             for col in range(min(18, cols)):
                 x = start_x + col * (tile_size + gap)
                 y = start_y + center_row * (tile_size + gap)
                 snake_segments.append((x, y))
+
+        # Draw remaining food tiles as distinct "apples" on top of the grid
+        for cell in remaining_food:
+            cx = cell["x"] + tile_size / 2
+            cy = cell["y"] + tile_size / 2
+            dwg.add(
+                dwg.circle(
+                    center=(cx, cy),
+                    r=tile_size * 0.35,
+                    fill="#ff5252",  # red apple
+                )
+            )
+            # small leaf
+            dwg.add(
+                dwg.rect(
+                    insert=(cx - 1, cy - tile_size * 0.35 - 2),
+                    size=(2, 3),
+                    fill="#43a047",
+                )
+            )
 
         if snake_segments:
             # Draw snake body segments (all but head)
