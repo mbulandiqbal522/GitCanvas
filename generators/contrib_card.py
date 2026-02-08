@@ -1,33 +1,21 @@
 import svgwrite
 import random
 from themes.styles import THEMES
+from .svg_base import create_svg_base
 
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     """
     Generates the Contribution Graph Card SVG.
     Supports 'Snake', 'Space', 'Marvel' visualization logic.
     """
-    theme = THEMES.get(theme_name, THEMES["Default"]).copy()
-    if custom_colors:
-        theme.update(custom_colors)
-    
     # Fake contribution data for visualization if not fully populated
     # In a real scenario, data['contributions'] would have the last ~15-30 days or weeks
     # For MVP we simulate a strip of activity
-    
+
     width = 500
     height = 150
-    dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
-    
-    # Background
-    dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=10, ry=10, 
-                     fill=theme["bg_color"], stroke=theme["border_color"], stroke_width=2))
-    
-    # Title
     title = f"{data['username']}'s Contributions"
-    dwg.add(dwg.text(title, insert=(20, 30), 
-                     fill=theme["title_color"], font_size=theme["title_font_size"], 
-                     font_family=theme["font_family"], font_weight="bold"))
+    dwg, theme = create_svg_base(theme_name, custom_colors, width, height, title)
     
     # Theme Specific Logic
     

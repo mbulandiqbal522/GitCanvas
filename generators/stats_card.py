@@ -1,5 +1,6 @@
 import svgwrite
 from themes.styles import THEMES
+from .svg_base import create_svg_base
 
 def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors=None):
     """
@@ -10,30 +11,18 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
     """
     if show_options is None:
         show_options = {"stars": True, "commits": True, "repos": True, "followers": True}
-        
-    theme = THEMES.get(theme_name, THEMES["Default"]).copy()
-    if custom_colors:
-        theme.update(custom_colors)
 
-    
     width = 450
     # Calculate height dynamically based on visible items
     base_height = 50
     item_height = 25
     visible_items = sum(1 for k, v in show_options.items() if v)
     height = base_height + (visible_items * item_height) + 10
-    
-    dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
-    
-    # Background
-    dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=10, ry=10, 
-                     fill=theme["bg_color"], stroke=theme["border_color"], stroke_width=2))
-    
-    # Title
+
+    dwg, theme = create_svg_base(theme_name, custom_colors, width, height, f"{data['username']}'s Stats")
+
     font_family = theme["font_family"]
-    dwg.add(dwg.text(f"{data['username']}'s Stats", insert=(20, 35), 
-                     fill=theme["title_color"], font_size=theme["title_font_size"], font_family=font_family, font_weight="bold"))
-    
+
     # Stats
     start_y = 65
     current_y = start_y
