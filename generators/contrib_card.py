@@ -1,7 +1,185 @@
 import svgwrite
-import random
 from themes.styles import THEMES
 import math
+from datetime import date, datetime, timedelta
+
+
+def _levels_from_cells(cells, max_count):
+    levels = []
+
+    for cell in cells:
+        if cell.get("is_future"):
+            levels.append(None)
+            continue
+
+        count = cell.get("count", 0)
+        if count <= 0 or max_count == 0:
+            levels.append(0)
+            continue
+
+        ratio = count / max_count
+        if ratio <= 0.25:
+            levels.append(1)
+        elif ratio <= 0.5:
+            levels.append(2)
+        elif ratio <= 0.75:
+            levels.append(3)
+        else:
+            levels.append(4)
+
+    return levels
+
+
+def _grid_positions(cols, rows, start_x, start_y, box_size, gap):
+    positions = []
+    for col in range(cols):
+        for row in range(rows):
+            x = start_x + col * (box_size + gap)
+            y = start_y + row * (box_size + gap)
+            positions.append((x, y))
+    return positions
+
+
+def _latest_contribution_date(contributions):
+    max_date = None
+    for item in contributions:
+        item_date = item.get("date") if item else None
+        if not item_date:
+            continue
+        try:
+            parsed = date.fromisoformat(item_date)
+        except Exception:
+            continue
+        if not max_date or parsed > max_date:
+            max_date = parsed
+
+    today = datetime.utcnow().date()
+    if max_date and max_date > today:
+        return today
+    return max_date
+
+
+def _weeks_from_dates(contributions, cols, rows):
+    if not contributions:
+        return [[{"date": None, "count": 0} for _ in range(rows)] for _ in range(cols)], None
+
+    date_counts = {}
+    for item in contributions:
+        item_date = item.get("date")
+        if not item_date:
+            continue
+        try:
+            parsed = date.fromisoformat(item_date)
+        except Exception:
+            continue
+        date_counts[parsed] = item.get("count", 0)
+
+    max_date = _latest_contribution_date(contributions)
+    if not max_date:
+        return [[{"date": None, "count": 0} for _ in range(rows)] for _ in range(cols)], None
+
+    days_to_sunday = (max_date.weekday() + 1) % 7
+    end_week_start = max_date - timedelta(days=days_to_sunday)
+    start_week_start = end_week_start - timedelta(days=(cols - 1) * 7)
+
+    weeks = []
+    for col in range(cols):
+        week_start = start_week_start + timedelta(days=col * 7)
+        week = []
+        for row in range(rows):
+            day_date = week_start + timedelta(days=row)
+            week.append({
+                "date": day_date.isoformat(),
+                "count": date_counts.get(day_date, 0)
+            })
+        weeks.append(week)
+
+    return weeks, max_date
+
+
+def _resolve_weeks(contributions, contribution_weeks, cols, rows):
+    if contribution_weeks:
+        weeks = contribution_weeks[-cols:]
+        normalized = []
+        for week in weeks:
+            week_days = list(week) if week else []
+            if len(week_days) < rows:
+                week_days = week_days + ([{"date": None, "count": 0}] * (rows - len(week_days)))
+            normalized.append(week_days[:rows])
+        if len(normalized) < cols:
+            pad = [[{"date": None, "count": 0} for _ in range(rows)] for _ in range(cols - len(normalized))]
+            normalized = pad + normalized
+        return normalized, _latest_contribution_date(contributions)
+
+    return _weeks_from_dates(contributions, cols, rows)
+
+
+def _weeks_to_cells(weeks, cols, rows, max_date):
+    cells = []
+    for col in range(cols):
+        week = weeks[col] if col < len(weeks) else []
+        for row in range(rows):
+            day = week[row] if row < len(week) else {"date": None, "count": 0}
+            item_date = day.get("date") if day else None
+            parsed = None
+            if item_date:
+                try:
+                    parsed = date.fromisoformat(item_date)
+                except Exception:
+                    parsed = None
+            is_future = bool(max_date and parsed and parsed > max_date)
+            cells.append({
+                "date": item_date,
+                "count": day.get("count", 0),
+                "is_future": is_future
+            })
+    return cells
+
+
+def _add_timeline_labels(dwg, weeks, cols, rows, start_x, start_y, box_size, gap, theme):
+    last_month = None
+    max_label_x = start_x + (cols - 1) * (box_size + gap)
+
+    for col, week in enumerate(weeks):
+        day = week[0] if week else None
+        day_date = None
+        if day and day.get("date"):
+            try:
+                day_date = date.fromisoformat(day["date"])
+            except Exception:
+                day_date = None
+
+        if not day_date:
+            continue
+
+        month_label = day_date.strftime("%b")
+        if month_label != last_month:
+            x = start_x + col * (box_size + gap) - 2
+            if x > max_label_x - 10:
+                x = max_label_x - 10
+            y = start_y - 10
+            dwg.add(dwg.text(
+                month_label,
+                insert=(x, y),
+                fill=theme["text_color"],
+                font_size=9,
+                font_family=theme["font_family"],
+                opacity=0.8
+            ))
+            last_month = month_label
+
+    label_x = start_x - 24
+    label_rows = {1: "Mon", 3: "Wed", 5: "Fri"}
+    for row, label in label_rows.items():
+        y = start_y + row * (box_size + gap) + box_size - 1
+        dwg.add(dwg.text(
+            label,
+            insert=(label_x, y),
+            fill=theme["text_color"],
+            font_size=9,
+            font_family=theme["font_family"],
+            opacity=0.8
+        ))
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     """
     Generates the Contribution Graph Card SVG.
@@ -11,12 +189,8 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     if custom_colors:
         theme.update(custom_colors)
     
-    # Fake contribution data for visualization if not fully populated
-    # In a real scenario, data['contributions'] would have the last ~15-30 days or weeks
-    # For MVP we simulate a strip of activity
-    
     width = 500
-    height = 150
+    height = 170
     dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
     
     # Background
@@ -25,47 +199,60 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     
     # Title
     title = f"{data['username']}'s Contributions"
-    dwg.add(dwg.text(title, insert=(20, 30), 
+    dwg.add(dwg.text(title, insert=(20, 24), 
                      fill=theme["title_color"], font_size=theme["title_font_size"], 
                      font_family=theme["font_family"], font_weight="bold"))
     
     # Theme Specific Logic
+    contributions = data.get("contributions", [])
     
+    total_days = len(contributions)
+    cols = 53 if total_days >= 371 else 52
+    rows = 7
+    weeks, max_date = _resolve_weeks(contributions, data.get("contribution_weeks"), cols, rows)
+
     if theme_name == "Gaming":
         # SNAKE Logic: A winding path of green blocks
         # "Eating my contributions" -> The snake head is at the last commit
         
-        grid_size = 15
-        start_x = 20
-        start_y = 50
+        grid_size = 7
+        gap = 2
+        start_x = 26
+        start_y = 72
+        cells = _weeks_to_cells(weeks, cols, rows, max_date)
+        max_count = max((cell["count"] for cell in cells if not cell["is_future"]), default=0)
+        levels = _levels_from_cells(cells, max_count)
+        positions = _grid_positions(cols, rows, start_x, start_y, grid_size, gap)
+
+        _add_timeline_labels(dwg, weeks, cols, rows, start_x, start_y, grid_size, gap, theme)
         
         # Draw a simple grid path (Snake body) taking up space
         dwg.add(dwg.text(f"SCORE: {data.get('total_commits', '0')}", insert=(width-120, 30),
                          fill=theme["text_color"], font_family="Courier New", font_size=16, font_weight="bold"))
         
-        # Draw Food (Contributions) randomly placed
-        # Red pixel apples
-        for i in range(8):
-             fx = random.randint(2, 28) * (grid_size+2) + start_x
-             fy = random.randint(1, 5) * (grid_size+2) + start_y
-             if fy > height - 20: fy = height - 20
-             dwg.add(dwg.rect(insert=(fx, fy), size=(grid_size, grid_size), fill="#FF3333", rx=2, ry=2)) # Apple
+        # Draw grid cells based on real contribution levels
+        colors = [theme["bg_color"], "#0e4429", "#006d32", "#26a641", "#39d353"]
+        last_active_index = None
 
-        # Draw Snake Body - Green path
-        # Simulating a snake that has grown long
-        segments = [(start_x + i*(grid_size+2), start_y + (grid_size+2)*2) for i in range(10)]
-        # Turn
-        segments.extend([(start_x + 9*(grid_size+2), start_y + (grid_size+2)*j) for j in range(3, 5)])
-        
-        for px, py in segments:
-            dwg.add(dwg.rect(insert=(px, py), size=(grid_size, grid_size), fill=theme["icon_color"], rx=2, ry=2))
-            
-        # Head
-        hx, hy = segments[-1]
-        dwg.add(dwg.rect(insert=(hx, hy), size=(grid_size, grid_size), fill=theme["title_color"])) 
-        # Eyes
-        dwg.add(dwg.rect(insert=(hx+3, hy+3), size=(3, 3), fill="black"))
-        dwg.add(dwg.rect(insert=(hx+9, hy+3), size=(3, 3), fill="black"))
+        for idx, (x, y) in enumerate(positions):
+            level = levels[idx]
+            if level is None:
+                continue
+            fill = colors[level]
+            dwg.add(dwg.rect(insert=(x, y), size=(grid_size, grid_size), fill=fill, rx=2, ry=2))
+            if level > 0:
+                last_active_index = idx
+
+            # Apples represent peak contribution days
+            if level == 4:
+                dwg.add(dwg.rect(insert=(x, y), size=(grid_size, grid_size), fill="#FF3333", rx=2, ry=2))
+
+        # Snake head at last active cell
+        if last_active_index is not None:
+            hx, hy = positions[last_active_index]
+            dwg.add(dwg.rect(insert=(hx, hy), size=(grid_size, grid_size), fill=theme["title_color"], rx=2, ry=2))
+            dwg.add(dwg.rect(insert=(hx + 1, hy + 2), size=(2, 2), fill="black"))
+            dwg.add(dwg.rect(insert=(hx + 4, hy + 2), size=(2, 2), fill="black"))
 
     elif theme_name == "Space":
         # Spaceship logic
@@ -82,14 +269,28 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             }
             """))
 
-        for i in range(30):
-            sx = random.randint(20, width - 20)
-            sy = random.randint(50, height - 20)
-            r = random.uniform(1, 3)
-            delay = random.uniform(0, 2)
+        cells = _weeks_to_cells(weeks, cols, rows, max_date)
+        max_count = max((cell["count"] for cell in cells if not cell["is_future"]), default=0)
+        levels = _levels_from_cells(cells, max_count)
+        start_x = 26
+        start_y = 72
+        grid_size = 7
+        gap = 2
+        positions = _grid_positions(cols, rows, start_x, start_y, grid_size, gap)
+
+        _add_timeline_labels(dwg, weeks, cols, rows, start_x, start_y, grid_size, gap, theme)
+
+        for idx, (sx, sy) in enumerate(positions):
+            level = levels[idx]
+            if level is None:
+                continue
+            if level == 0:
+                continue
+            r = 1 + (level * 0.7)
+            delay = (idx % 10) * 0.2
 
             star = dwg.circle(
-                center=(sx, sy),
+                center=(sx + 5, sy + 5),
                 r=r,
                 fill="white",
                 class_="star",
@@ -118,15 +319,34 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         cx = width / 2
         cy = height / 2 + 10
         
+        counts = [cell["count"] for cell in _weeks_to_cells(weeks, cols, rows, max_date) if not cell["is_future"]]
+        if counts:
+            bucket_size = max(1, len(counts) // len(stones))
+        else:
+            bucket_size = 1
+
+        bucket_values = []
+        for i in range(len(stones)):
+            start = i * bucket_size
+            end = start + bucket_size
+            values = counts[start:end] if counts else []
+            avg = sum(values) / len(values) if values else 0
+            bucket_values.append(avg)
+
+        max_bucket = max(bucket_values) if bucket_values else 0
+
         # Gauntlet hints? Or just the stones glowing
         for i, color in enumerate(stones):
             sx = 60 + i * 60
             sy = cy
+            intensity = 0 if max_bucket == 0 else bucket_values[i] / max_bucket
+            glow = 8 + (intensity * 14)
+            stone_r = 6 + (intensity * 6)
             
             # Glow
-            dwg.add(dwg.circle(center=(sx, sy), r=15, fill=color, opacity=0.3))
+            dwg.add(dwg.circle(center=(sx, sy), r=glow, fill=color, opacity=0.25 + (intensity * 0.35)))
             # Stone
-            dwg.add(dwg.circle(center=(sx, sy), r=8, fill=color, stroke="white", stroke_width=1))
+            dwg.add(dwg.circle(center=(sx, sy), r=stone_r, fill=color, stroke="white", stroke_width=1))
             
             # Label below
             dwg.add(dwg.text(f"Stone {i+1}", insert=(sx, sy+30), fill="white", font_size=10, text_anchor="middle"))
@@ -162,13 +382,13 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             # Hemisphere split
             side = -1 if i % 2 == 0 else 1
 
-            # Organic brain ellipse
-            angle = random.uniform(0, math.pi)
-            radius_x = random.uniform(90, 150)
-            radius_y = random.uniform(60, 110)
+            # Organic brain ellipse (deterministic)
+            angle = (i / max(len(contributions), 1)) * math.pi
+            radius_x = 90 + (i % 10) * 6
+            radius_y = 60 + (i % 7) * 6
 
-            # Distortion noise
-            noise = random.uniform(0.85, 1.15)
+            # Distortion noise derived from count
+            noise = 0.9 + ((count % 5) * 0.03)
 
             x = cx + side * math.cos(angle) * radius_x * noise
             y = cy + math.sin(angle) * radius_y * noise
@@ -191,9 +411,11 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         for i in range(len(nodes)):
             x1, y1, c1 = nodes[i]
 
-            # Each neuron connects to a few others
-            for _ in range(random.randint(2, 6)):
-                j = random.randint(0, len(nodes) - 1)
+            for step in (1, 3, 7):
+                j = i + step
+                if j >= len(nodes):
+                    continue
+
                 x2, y2, c2 = nodes[j]
 
                 dist = math.hypot(x2 - x1, y2 - y1)
@@ -213,30 +435,24 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     else:
         # Default Grid (Github Style)
         # Just simple squares
-        box_size = 12
-        gap = 3
-        start_x = 20
-        start_y = 60
-        
-        count = 0
-        for col in range(25): # 25 weeks horizontal
-            for row in range(5): # 5 days vertical
-                x = start_x + col * (box_size + gap)
-                y = start_y + row * (box_size + gap)
-                
-                # Random "green" level
-                level = random.choice([0, 1, 2, 3, 4])
-                colors = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
-                
-                # Use theme override if set
-                # For default we stick to standard GH colors unless customized logic is deeper
-                # But let's respect the theme accent
-                fill = colors[level]
-                if level > 0:
-                     # Mix with theme accent roughly?
-                     # For now just keep standard GH style for "Default"
-                     pass
-                     
-                dwg.add(dwg.rect(insert=(x, y), size=(box_size, box_size), fill=fill, rx=2, ry=2))
+        box_size = 7
+        gap = 2
+        start_x = 26
+        start_y = 72
+        cells = _weeks_to_cells(weeks, cols, rows, max_date)
+        max_count = max((cell["count"] for cell in cells if not cell["is_future"]), default=0)
+        levels = _levels_from_cells(cells, max_count)
+        positions = _grid_positions(cols, rows, start_x, start_y, box_size, gap)
+
+        _add_timeline_labels(dwg, weeks, cols, rows, start_x, start_y, box_size, gap, theme)
+
+        colors = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
+
+        for idx, (x, y) in enumerate(positions):
+            level = levels[idx]
+            if level is None:
+                continue
+            fill = colors[level]
+            dwg.add(dwg.rect(insert=(x, y), size=(box_size, box_size), fill=fill, rx=2, ry=2))
                 
     return dwg.tostring()

@@ -1,7 +1,15 @@
 import requests
 import os
 
+try:
+    from dotenv import load_dotenv
+except Exception:
+    load_dotenv = None
+
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
+
+if load_dotenv:
+    load_dotenv()
 
 
 
@@ -54,12 +62,17 @@ def parse_graphql_contributions(graphql_json):
     )
 
     contributions = []
+    contribution_weeks = []
     for week in weeks:
+        week_days = []
         for day in week["contributionDays"]:
-            contributions.append({
+            day_entry = {
                 "date": day["date"],
                 "count": day["contributionCount"]
-            })
+            }
+            contributions.append(day_entry)
+            week_days.append(day_entry)
+        contribution_weeks.append(week_days)
 
     total_commits = (
         graphql_json["data"]["user"]
@@ -67,7 +80,7 @@ def parse_graphql_contributions(graphql_json):
         ["totalCommitContributions"]
     )
 
-    return contributions, total_commits
+    return contributions, total_commits, contribution_weeks
 
 
 def get_github_headers():
@@ -149,11 +162,16 @@ def get_live_github_data(username):
         graphql_data = fetch_github_graphql(username)
         if graphql_data:
             try:
-                contributions, gql_total_commits = parse_graphql_contributions(graphql_data)
+                contributions, gql_total_commits, contribution_weeks = parse_graphql_contributions(graphql_data)
                 data["contributions"] = contributions
                 data["total_commits"] = gql_total_commits
+                data["contribution_weeks"] = contribution_weeks
             except Exception:
                 pass  # Never break REST fallback
+
+        if "contributions" not in data:
+            # Fallback to empty list; UI should handle missing contribution data gracefully.
+            data["contributions"] = []
 
         return data
 
