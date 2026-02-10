@@ -397,183 +397,152 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         dwg.add(dwg.text("SNAP!", insert=(width-80, cy), fill=theme["title_color"], font_size=24, font_weight="bold", font_family="Impact"))
 
     elif theme_name == "Glass":
-        # Glassmorphism contribution panel
+        # Neon Liquid Glassmorphism Theme
+        
+        # --- 1. Definining Filters & Gradients ---
+        
+        # Blur filter for background blobs
+        blob_blur = dwg.filter(id="blobBlur", x="-50%", y="-50%", width="200%", height="200%")
+        blob_blur.feGaussianBlur(in_="SourceGraphic", stdDeviation=40)
+        dwg.defs.add(blob_blur)
+        
+        # Glow filter for text
+        text_glow = dwg.filter(id="textGlow")
+        text_glow.feGaussianBlur(in_="SourceAlpha", stdDeviation=2, result="blur")
+        text_glow.feOffset(in_="blur", dx=0, dy=0, result="offsetBlur")
+        text_glow.feFlood(flood_color="#00e5ff", result="glowColor") # Cyan glow
+        text_glow.feComposite(in_="glowColor", in2="offsetBlur", operator="in", result="coloredBlur")
+        
+        # Merge glow with original text
+        text_glow.feMerge(["coloredBlur", "SourceGraphic"])
+        
+        dwg.defs.add(text_glow)
 
-        # --- Background gradient (subtle, dark, non-flat) ---
-        bg_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="glassBg")
-        bg_grad.add_stop_color(0, "#020617")
-        bg_grad.add_stop_color(0.5, "#0b1220")
-        bg_grad.add_stop_color(1, "#020617")
-        dwg.defs.add(bg_grad)
+        # Glass Panel Gradient (Subtle diagonal)
+        glass_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="glassGrad")
+        glass_grad.add_stop_color(0, "white", opacity=0.15)
+        glass_grad.add_stop_color(1, "white", opacity=0.05)
+        dwg.defs.add(glass_grad)
+        
+        # Border Gradient
+        border_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="borderGrad")
+        border_grad.add_stop_color(0, "white", opacity=0.4)
+        border_grad.add_stop_color(1, "white", opacity=0.1)
+        dwg.defs.add(border_grad)
 
+        # --- 2. Background Base ---
+        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill="#050511")) # Deep dark background
+
+        # --- 3. Neon Blobs (The "Liquid") ---
+        # Magenta/Pink Blob (Top Left)
+        dwg.add(dwg.circle(center=(0, 0), r=120, fill="#ff00ff", filter="url(#blobBlur)", opacity=0.6))
+        
+        # Cyan/Blue Blob (Bottom Right)
+        dwg.add(dwg.circle(center=(width, height), r=140, fill="#00ffff", filter="url(#blobBlur)", opacity=0.5))
+        
+        # Purple Blob (Middle Right)
+        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill="#9d4edd", filter="url(#blobBlur)", opacity=0.6))
+         
+        # Deep Blue Blob (Bottom Left)
+        dwg.add(dwg.circle(center=(width*0.2, height*1.1), r=100, fill="#2563eb", filter="url(#blobBlur)", opacity=0.6))
+
+
+        # --- 4. The Glass Panel ---
+        margin = 25
+        panel_width = width - margin * 2
+        panel_height = height - margin * 2
+        
+        # Initial Backdrop blur simulation (Darken overlay)
+        dwg.add(dwg.rect(insert=(margin, margin), size=(panel_width, panel_height), rx=16, ry=16, fill="#000000", opacity=0.2))
+
+        # The Glass Rect
         dwg.add(
             dwg.rect(
-                insert=(0, 0),
-                size=("100%", "100%"),
-                rx=18,
-                ry=18,
-                fill="url(#glassBg)",
+                insert=(margin, margin),
+                size=(panel_width, panel_height),
+                rx=16,
+                ry=16,
+                fill="url(#glassGrad)",
+                stroke="url(#borderGrad)",
+                stroke_width=1.5
             )
         )
 
-        # --- Noise overlay (very subtle grain) ---
-        # Approximate with a low-opacity white overlay to simulate texture
-        dwg.add(
-            dwg.rect(
-                insert=(0, 0),
-                size=("100%", "100%"),
-                rx=18,
-                ry=18,
-                fill="#ffffff",
-                fill_opacity=0.02,
-            )
-        )
-
-        # --- Glass blur filter for inner panel ---
-        glass_filter = dwg.filter(
-            id="glassBlur",
-            x="-20%",
-            y="-20%",
-            width="140%",
-            height="140%",
-        )
-        glass_filter.feGaussianBlur(in_="SourceGraphic", stdDeviation=10)
-        glass_filter.feColorMatrix(
-            type="matrix",
-            values=(
-                "1 0 0 0 0 "
-                "0 1 0 0 0 "
-                "0 0 1 0 0 "
-                "0 0 0 0.75 0"
-            ),
-        )
-        dwg.defs.add(glass_filter)
-
-        # --- Inner glass card ---
-        inner_margin_x = 28
-        inner_margin_y = 30
-
-        panel = dwg.rect(
-            insert=(inner_margin_x, inner_margin_y),
-            size=(width - inner_margin_x * 2, height - inner_margin_y * 2),
-            rx=22,
-            ry=22,
-            fill="#ffffff",
-            fill_opacity=0.10,
-            stroke=theme["border_color"],
-            stroke_width=1.2,
-        )
-        panel["filter"] = "url(#glassBlur)"
-        dwg.add(panel)
-
-        # Soft outer glow around panel
-        dwg.add(
-            dwg.rect(
-                insert=(inner_margin_x - 2, inner_margin_y - 2),
-                size=(width - inner_margin_x * 2 + 4, height - inner_margin_y * 2 + 4),
-                rx=24,
-                ry=24,
-                fill=theme["border_color"],
-                fill_opacity=0.06,
-            )
-        )
-
-        # --- Header content ---
-        header_y = inner_margin_y + 20
-
+        # --- 5. Content ---
+        
+        # Title (Styled like "GLASSMORPHISM" in reference)
         dwg.add(
             dwg.text(
-                title,
-                insert=(inner_margin_x + 16, header_y),
-                fill=theme["title_color"],
-                font_size=theme["title_font_size"],
-                font_family=theme["font_family"],
+                title.upper(),
+                insert=(width/2, margin + 40),
+                fill="white",
+                font_size=20,
+                font_family="Verdana, sans-serif",
                 font_weight="bold",
+                text_anchor="middle",
+                letter_spacing=4,
+                filter="url(#textGlow)" # Add neon glow to text
             )
         )
-
-        # Small subtitle (optional) under title
+        
+        # Subtitle
         dwg.add(
             dwg.text(
-                "Last year of activity",
-                insert=(inner_margin_x + 16, header_y + 18),
-                fill=theme["text_color"],
-                font_size=theme["text_font_size"] - 2,
-                font_family=theme["font_family"],
-                fill_opacity=0.7,
+                "NEON LIQUID",
+                insert=(width/2, margin + 60),
+                fill="#e0e0e0",
+                font_size=10,
+                font_family="Verdana, sans-serif",
+                letter_spacing=2,
+                text_anchor="middle",
+                opacity=0.8
             )
         )
 
-        # --- Contributions as glass bubbles in a tight grid ---
-        contributions = data.get("contributions", [])[-180:]  # last ~180 days
-        grid_start_x = inner_margin_x + 20
-        grid_start_y = inner_margin_y + 42
-        cell_x_gap = 16
-        cell_y_gap = 14
-        max_cols = 24  # more compact than default card
-
-        x = grid_start_x
-        y = grid_start_y
-
-        for idx, day in enumerate(contributions):
+        # --- 6. Contributions Grid (Bubbles) ---
+        # Grid settings
+        contributions = data.get("contributions", [])[-119:] # Fit less days for cleaner look (~17 weeks)
+        cols = 17 
+        rows = 7
+        
+        grid_width = cols * 20
+        grid_height = rows * 20
+        start_x = (width - grid_width) / 2 + 10 # Center the grid
+        start_y = margin + 80
+        
+        for i, day in enumerate(contributions):
+            col = i // rows
+            row = i % rows
+            
+            cx = start_x + col * 22
+            cy = start_y + row * 22
+            
             count = day.get("count", 0)
-
-            # Map count -> radius + opacity
-            if count == 0:
-                r = 2
-                opacity = 0.12
-                bubble_color = "#e5e7eb"
-            elif count < 3:
-                r = 3.5
-                opacity = 0.25
-                bubble_color = "#bae6fd"
-            elif count < 7:
-                r = 4.5
-                opacity = 0.45
-                bubble_color = "#7dd3fc"
-            else:
-                r = 6
-                opacity = 0.7
-                bubble_color = "#38bdf8"
-
-            # Base bubble
-            dwg.add(
-                dwg.circle(
-                    center=(x, y),
-                    r=r,
-                    fill=bubble_color,
-                    fill_opacity=opacity,
-                )
-            )
-
-            # Inner highlight for non-zero
+            
+            # Bubble aesthetic
+            r = 6
+            bg_opacity = 0.1
+            fill = "#ffffff"
+            stroke = "none"
+            
             if count > 0:
-                dwg.add(
-                    dwg.circle(
-                        center=(x - r * 0.3, y - r * 0.4),
-                        r=r * 0.45,
-                        fill="#ffffff",
-                        fill_opacity=0.35,
-                    )
-                )
+                bg_opacity = 0.8
+                # Gradient of intensity
+                if count < 3:
+                     fill = "#00ffff" # Cyan
+                     r = 6.5
+                elif count < 6:
+                     fill = "#bd00ff" # Purple
+                     r = 7.5
+                else:
+                     fill = "#ff0099" # Pink
+                     r = 8.5
+                
+                # Glow effect for active cells
+                # Simple duplicate for glow
+                dwg.add(dwg.circle(center=(cx, cy), r=r+2, fill=fill, opacity=0.3, filter="url(#blobBlur)"))
 
-            # Slight shadow below to add depth
-            if count > 0:
-                dwg.add(
-                    dwg.ellipse(
-                        center=(x, y + r * 0.4),
-                        r=(r * 0.9, r * 0.3),
-                        fill="#020617",
-                        fill_opacity=0.35,
-                    )
-                )
-
-            # Advance grid
-            if (idx + 1) % max_cols == 0:
-                x = grid_start_x
-                y += cell_y_gap
-            else:
-                x += cell_x_gap
+            dwg.add(dwg.circle(center=(cx, cy), r=r, fill=fill, fill_opacity=bg_opacity))
     else:
         # Default Grid (Github Style)
         # Just simple squares
