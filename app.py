@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import os
 from dotenv import load_dotenv
+import cairosvg
 from roast_widget_streamlit import render_roast_widget
 from generators import stats_card, lang_card, contrib_card, badge_generator
 from utils import github_api
@@ -107,6 +108,18 @@ def render_tab(svg_bytes, endpoint, username, selected_theme, custom_colors, hid
         # Render SVG
         b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
         st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
+
+        # Convert SVG to PNG
+        png_bytes = cairosvg.svg2png(bytestring=svg_bytes.encode('utf-8'))
+
+        # Download PNG button
+        st.download_button(
+            label="Download PNG",
+            data=png_bytes,
+            file_name=f"{endpoint}_{username}.png",
+            mime="image/png",
+            use_container_width=True
+        )
 
     with col2:
         st.subheader("Integration")
