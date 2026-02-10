@@ -1,6 +1,7 @@
 import svgwrite
 import random
 from themes.styles import THEMES
+from themes.ocean import render_ocean
 from .svg_base import create_svg_base
 
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
@@ -81,25 +82,29 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     elif theme_name == "Marvel":
         # Infinity Stones
         stones = ["#FFD700", "#FF0000", "#0000FF", "#800080", "#008000", "#FFA500"] # Mind, Reality, Space, Power, Time, Soul
-        
+
         # Draw slots
         cx = width / 2
         cy = height / 2 + 10
-        
+
         # Gauntlet hints? Or just the stones glowing
         for i, color in enumerate(stones):
             sx = 60 + i * 60
             sy = cy
-            
+
             # Glow
             dwg.add(dwg.circle(center=(sx, sy), r=15, fill=color, opacity=0.3))
             # Stone
             dwg.add(dwg.circle(center=(sx, sy), r=8, fill=color, stroke="white", stroke_width=1))
-            
+
             # Label below
             dwg.add(dwg.text(f"Stone {i+1}", insert=(sx, sy+30), fill="white", font_size=10, text_anchor="middle"))
-            
+
         dwg.add(dwg.text("SNAP!", insert=(width-80, cy), fill=theme["title_color"], font_size=24, font_weight="bold", font_family="Impact"))
+
+    elif theme_name == "Ocean":
+        # Ocean theme: waves, coral, fish/bubbles for contributions
+        render_ocean(dwg, data, theme)
 
     else:
         # Default Grid (Github Style)

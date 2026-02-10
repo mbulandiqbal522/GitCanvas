@@ -160,6 +160,7 @@ with tab3:
     if selected_theme == "Gaming": st.caption("🐍 Snake Mode: The snake grows as it eats commits.")
     elif selected_theme == "Space": st.caption("🚀 Space Mode: Spaceship traversing the contribution galaxy.")
     elif selected_theme == "Marvel": st.caption("💎 Infinity Mode: Collecting Stones based on activity.")
+    elif selected_theme == "Ocean": st.caption("🌊 Ocean Mode: Fish and bubbles swim through underwater contributions.")
 
     svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
     render_tab(svg_bytes, "contributions", username, selected_theme, custom_colors, code_template="![Contributions]({url})")
