@@ -1,7 +1,7 @@
 import svgwrite
 import random
 from themes.styles import THEMES
-
+import math
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     """
     Generates the Contribution Graph Card SVG.
@@ -199,14 +199,34 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     elif theme_name == "Space":
         # Spaceship logic
         # Commits are stars.
-        
-        # Draw random stars
-        for _ in range(30):
-            sx = random.randint(20, width-20)
-            sy = random.randint(50, height-20)
+        dwg.defs.add(dwg.style("""
+            @keyframes twinkle {
+            0%   { opacity: 0.3; }
+            50%  { opacity: 1; }
+            100% { opacity: 0.3; }
+            }
+
+            .star {
+            animation: twinkle 2s ease-in-out infinite;
+            }
+            """))
+
+        for i in range(30):
+            sx = random.randint(20, width - 20)
+            sy = random.randint(50, height - 20)
             r = random.uniform(1, 3)
-            dwg.add(dwg.circle(center=(sx, sy), r=r, fill="white", opacity=random.uniform(0.5, 1.0)))
-            
+            delay = random.uniform(0, 2)
+
+            star = dwg.circle(
+                center=(sx, sy),
+                r=r,
+                fill="white",
+                class_="star",
+                style=f"animation-delay: {delay}s"
+            )
+
+            dwg.add(star)
+
         # Draw Spaceship (Simple triangle)
         ship_x = width - 60
         ship_y = height / 2 + 10
@@ -378,23 +398,32 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             stroke = "none"
             
             if count > 0:
-                bg_opacity = 0.8
-                # Gradient of intensity
-                if count < 3:
-                     fill = "#00ffff" # Cyan
-                     r = 6.5
-                elif count < 6:
-                     fill = title_col # Use Title Color for mid-range (Dynamic)
-                     r = 7.5
-                else:
-                     fill = "#ff0099" # Pink
-                     r = 8.5
-                
-                # Glow effect for active cells
-                # Simple duplicate for glow
-                dwg.add(dwg.circle(center=(cx, cy), r=r+2, fill=fill, opacity=0.3, filter="url(#blobBlur)"))
+                dwg.add(
+                    dwg.circle(
+                        center=(x - r * 0.3, y - r * 0.4),
+                        r=r * 0.45,
+                        fill="#ffffff",
+                        fill_opacity=0.35,
+                    )
+                )
 
-            dwg.add(dwg.circle(center=(cx, cy), r=r, fill=fill, fill_opacity=bg_opacity))
+            # Slight shadow below to add depth
+            if count > 0:
+                dwg.add(
+                    dwg.ellipse(
+                        center=(x, y + r * 0.4),
+                        r=(r * 0.9, r * 0.3),
+                        fill="#020617",
+                        fill_opacity=0.35,
+                    )
+                )
+
+            # Advance grid
+            if (idx + 1) % max_cols == 0:
+                x = grid_start_x
+                y += cell_y_gap
+            else:
+                x += cell_x_gap
     else:
         # Default Grid (Github Style)
         # Just simple squares
