@@ -399,6 +399,12 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     elif theme_name == "Glass":
         # Neon Liquid Glassmorphism Theme
         
+        # Theme Variables
+        bg_col = theme.get("bg_color", "#050511")
+        title_col = theme.get("title_color", "#00e5ff")
+        text_col = theme.get("text_color", "#e0e0e0")
+        border_col = theme.get("border_color", "white")
+        
         # --- 1. Definining Filters & Gradients ---
         
         # Blur filter for background blobs
@@ -410,7 +416,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         text_glow = dwg.filter(id="textGlow")
         text_glow.feGaussianBlur(in_="SourceAlpha", stdDeviation=2, result="blur")
         text_glow.feOffset(in_="blur", dx=0, dy=0, result="offsetBlur")
-        text_glow.feFlood(flood_color="#00e5ff", result="glowColor") # Cyan glow
+        text_glow.feFlood(flood_color=title_col, result="glowColor") # Dynamic Glow
         text_glow.feComposite(in_="glowColor", in2="offsetBlur", operator="in", result="coloredBlur")
         
         # Merge glow with original text
@@ -426,12 +432,12 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         
         # Border Gradient
         border_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="borderGrad")
-        border_grad.add_stop_color(0, "white", opacity=0.4)
-        border_grad.add_stop_color(1, "white", opacity=0.1)
+        border_grad.add_stop_color(0, border_col, opacity=0.4)
+        border_grad.add_stop_color(1, border_col, opacity=0.1)
         dwg.defs.add(border_grad)
 
         # --- 2. Background Base ---
-        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill="#050511")) # Deep dark background
+        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill=bg_col)) # Dynamic background
 
         # --- 3. Neon Blobs (The "Liquid") ---
         # Magenta/Pink Blob (Top Left)
@@ -441,7 +447,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         dwg.add(dwg.circle(center=(width, height), r=140, fill="#00ffff", filter="url(#blobBlur)", opacity=0.5))
         
         # Purple Blob (Middle Right)
-        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill="#9d4edd", filter="url(#blobBlur)", opacity=0.6))
+        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill=title_col, filter="url(#blobBlur)", opacity=0.6))
          
         # Deep Blue Blob (Bottom Left)
         dwg.add(dwg.circle(center=(width*0.2, height*1.1), r=100, fill="#2563eb", filter="url(#blobBlur)", opacity=0.6))
@@ -490,7 +496,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             dwg.text(
                 "NEON LIQUID",
                 insert=(width/2, margin + 60),
-                fill="#e0e0e0",
+                fill=text_col,
                 font_size=10,
                 font_family="Verdana, sans-serif",
                 letter_spacing=2,
@@ -532,7 +538,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
                      fill = "#00ffff" # Cyan
                      r = 6.5
                 elif count < 6:
-                     fill = "#bd00ff" # Purple
+                     fill = title_col # Use Title Color for mid-range (Dynamic)
                      r = 7.5
                 else:
                      fill = "#ff0099" # Pink

@@ -25,11 +25,23 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
     
     # --- Theme Logic ---
     if theme_name == "Glass":
-        # Height adjustment for glass margins
+        # Height adjustment for glass margins and increased spacing
         margin = 25
-        height += margin * 2
+        header_height = 80 # margin + 40 + text height etc
+        glass_item_height = 35
+        visible_items = sum(1 for k, v in show_options.items() if v)
+        
+        # Recalculate height explicitly for Glass layout
+        # height = Top Margin + Header area + (Items * Item Height) + Bottom Margin
+        height = margin + 80 + (visible_items * glass_item_height) + margin
         
         dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
+        
+        # Theme Variable Mapping
+        bg_col = theme.get("bg_color", "#050511")
+        title_col = theme.get("title_color", "#00e5ff") # Default cyan if not set
+        text_col = theme.get("text_color", "#e2e8f0")
+        border_col = theme.get("border_color", "white")
         
         # 1. Definitions
         # Blob Blur
@@ -41,7 +53,7 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
         text_glow = dwg.filter(id="textGlow")
         text_glow.feGaussianBlur(in_="SourceAlpha", stdDeviation=2, result="blur")
         text_glow.feOffset(in_="blur", dx=0, dy=0, result="offsetBlur")
-        text_glow.feFlood(flood_color="#00e5ff", result="glowColor")
+        text_glow.feFlood(flood_color=title_col, result="glowColor") # Dynamic Glow
         text_glow.feComposite(in_="glowColor", in2="offsetBlur", operator="in", result="coloredBlur")
         text_glow.feMerge(["coloredBlur", "SourceGraphic"])
         dwg.defs.add(text_glow)
@@ -53,17 +65,28 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
         dwg.defs.add(glass_grad)
         
         border_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="borderGrad")
-        border_grad.add_stop_color(0, "white", opacity=0.4)
-        border_grad.add_stop_color(1, "white", opacity=0.1)
+        border_grad.add_stop_color(0, border_col, opacity=0.4)
+        border_grad.add_stop_color(1, border_col, opacity=0.1)
         dwg.defs.add(border_grad)
 
         # 2. Background Base
-        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill="#050511"))
+        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill=bg_col))
 
-        # 3. Neon Blobs
+        # 3. Neon Blobs (Use title color variations or keep RGB if user wants "Neon Liquid" specifically)
+        # To make it truly dynamic, we can mix the title color or just keep the rainbow for "Neon Liquid" identity.
+        # However, user asked to "change the color design using available option".
+        # Let's derive blob colors from title_color if possible, or just respect customization.
+        # A simple way: If customized, use custom colors. If default Neon Liquid, use RGB.
+        # But 'theme' is always passed. 
+        # Let's use the title_color for the main blobs and maybe a variation for others.
+        # Or just keep the multicolor blobs as they ARE the theme. 
+        # Re-reading: "give the dynamic color option to change the color design".
+        # I will change the blobs to respect the `title_color` (Primary) and `border_color` (Secondary) if provided.
+        # For now, I'll keep the multi-color as default but maybe tint them?
+        # Let's just update the Background, Title, Text, and Border as requested.
         dwg.add(dwg.circle(center=(0, 0), r=120, fill="#ff00ff", filter="url(#blobBlur)", opacity=0.6))
         dwg.add(dwg.circle(center=(width, height), r=140, fill="#00ffff", filter="url(#blobBlur)", opacity=0.5))
-        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill="#9d4edd", filter="url(#blobBlur)", opacity=0.6))
+        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill=title_col, filter="url(#blobBlur)", opacity=0.6))
         dwg.add(dwg.circle(center=(width*0.2, height*1.1), r=100, fill="#2563eb", filter="url(#blobBlur)", opacity=0.6))
 
         # 4. Glass Panel
@@ -94,7 +117,6 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
         # Stats Items
         start_y = margin + 80
         current_y = start_y
-        text_color = "#e2e8f0" # Light gray/white
         
         # Logic to handle N/A display for commits
         commit_val = data.get('total_commits', 0)
@@ -109,19 +131,19 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
         
         for key, label, value in stats_map:
             if show_options.get(key, True):
-                # Icon (Neon Dot)
-                dwg.add(dwg.circle(center=(margin + 30, current_y - 5), r=4, fill="#00e5ff", filter="url(#blobBlur)", opacity=0.8)) # Glow effect on dot
+                # Icon (Neon Dot) - Use Title Color
+                dwg.add(dwg.circle(center=(margin + 30, current_y - 5), r=4, fill=title_col, filter="url(#blobBlur)", opacity=0.8)) 
                 dwg.add(dwg.circle(center=(margin + 30, current_y - 5), r=3, fill="#ffffff"))
                 
                 # Label
                 dwg.add(dwg.text(f"{label}:", insert=(margin + 45, current_y), 
-                                 fill=text_color, font_size=14, font_family="Verdana, sans-serif"))
+                                 fill=text_col, font_size=14, font_family="Verdana, sans-serif"))
                 
                 # Value
                 dwg.add(dwg.text(f"{value}", insert=(width - margin - 40, current_y), 
                                  fill="white", font_size=14, font_family="Verdana, sans-serif", text_anchor="end", font_weight="bold"))
                                  
-                current_y += 35 # Increased spacing for glass look
+                current_y += glass_item_height
 
     else:
         # Default / Other Themes

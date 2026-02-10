@@ -22,9 +22,18 @@ def draw_lang_card(data, theme_name="Default", custom_colors=None):
 
     if theme_name == "Glass":
         margin = 25
-        height += margin * 2
+        # Recalculate height: Margin + Header + Items + Item Padding + Margin
+        header_height = 80
+        item_spacing = 45
+        height = margin + header_height + (len(langs) * item_spacing) + margin
         
         dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
+        
+        # Theme Variables
+        bg_col = theme.get("bg_color", "#050511")
+        title_col = theme.get("title_color", "#00e5ff")
+        text_col = theme.get("text_color", "#e2e8f0")
+        border_col = theme.get("border_color", "white")
         
         # 1. Definitions
         blob_blur = dwg.filter(id="blobBlur", x="-50%", y="-50%", width="200%", height="200%")
@@ -34,14 +43,14 @@ def draw_lang_card(data, theme_name="Default", custom_colors=None):
         text_glow = dwg.filter(id="textGlow")
         text_glow.feGaussianBlur(in_="SourceAlpha", stdDeviation=2, result="blur")
         text_glow.feOffset(in_="blur", dx=0, dy=0, result="offsetBlur")
-        text_glow.feFlood(flood_color="#00e5ff", result="glowColor")
+        text_glow.feFlood(flood_color=title_col, result="glowColor") # Dynamic Glow
         text_glow.feComposite(in_="glowColor", in2="offsetBlur", operator="in", result="coloredBlur")
         text_glow.feMerge(["coloredBlur", "SourceGraphic"])
         dwg.defs.add(text_glow)
         
         bar_grad = dwg.linearGradient(start=(0, 0), end=(1, 0), id="barGrad")
-        bar_grad.add_stop_color(0, "#00ffff") # Cyan
-        bar_grad.add_stop_color(1, "#ff00ff") # Magenta
+        bar_grad.add_stop_color(0, title_col) # Start with Title Color (e.g. Cyan)
+        bar_grad.add_stop_color(1, "#ff00ff") # End with Magenta (Signature Neon)
         dwg.defs.add(bar_grad)
 
         glass_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="glassGrad")
@@ -50,15 +59,15 @@ def draw_lang_card(data, theme_name="Default", custom_colors=None):
         dwg.defs.add(glass_grad)
         
         border_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="borderGrad")
-        border_grad.add_stop_color(0, "white", opacity=0.4)
-        border_grad.add_stop_color(1, "white", opacity=0.1)
+        border_grad.add_stop_color(0, border_col, opacity=0.4)
+        border_grad.add_stop_color(1, border_col, opacity=0.1)
         dwg.defs.add(border_grad)
 
         # 2. Background
-        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill="#050511"))
+        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=16, ry=16, fill=bg_col))
         dwg.add(dwg.circle(center=(0, 0), r=120, fill="#ff00ff", filter="url(#blobBlur)", opacity=0.6))
         dwg.add(dwg.circle(center=(width, height), r=140, fill="#00ffff", filter="url(#blobBlur)", opacity=0.5))
-        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill="#9d4edd", filter="url(#blobBlur)", opacity=0.6))
+        dwg.add(dwg.circle(center=(width*0.8, height*0.3), r=80, fill=title_col, filter="url(#blobBlur)", opacity=0.6))
         
         # 3. Glass Panel
         panel_width = width - margin * 2
