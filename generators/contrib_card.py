@@ -2,18 +2,15 @@ import svgwrite
 import random
 from themes.styles import THEMES
 import math
+
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     """
     Generates the Contribution Graph Card SVG.
     Supports 'Snake', 'Space', 'Marvel' visualization logic.
     """
-    theme = THEMES.get(theme_name, THEMES["Default"]).copy()
-    if custom_colors:
-        theme.update(custom_colors)
-    
-    # Fake contribution data for visualization if not fully populated
-    # In a real scenario, data['contributions'] would have the last ~15-30 days or weeks
-    # For MVP we simulate a strip of activity
+    # FIXED: Handle both string theme name and pre-resolved theme dict
+    # Also save the original theme name string for comparison later
+    original_theme_name = theme_name
     
     # Allow a slightly larger playground for Gaming / Snake
     if theme_name == "Gaming":
@@ -31,10 +28,10 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     # Title
     title = f"{data['username']}'s Contributions"
     dwg.add(dwg.text(title, insert=(20, 30), 
-                     fill=theme["title_color"], font_size=theme["title_font_size"], 
-                     font_family=theme["font_family"], font_weight="bold"))
+                     fill=theme["title_color"], font_size=theme.get("title_font_size", 18), 
+                     font_family=theme.get("font_family", "Arial"), font_weight="bold"))
     
-    # Theme Specific Logic
+    # Theme Specific Logic - use original_theme_name for string comparisons
     
     # Theme Specific Logic
     if theme_name == "Gaming":
@@ -49,6 +46,9 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         gap = 2
         cols = 28
         rows = 7
+    if original_theme_name == "Gaming":
+        # SNAKE Logic: A winding path of green blocks
+        # "Eating my contributions" -> The snake head is at the last commit
         
         start_x = 20
         start_y = 55
@@ -196,7 +196,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         dwg.add(dwg.rect(insert=(hx + 2, eyey), size=(3, 3), fill="black"))
         dwg.add(dwg.rect(insert=(hx + tile_size - 5, eyey), size=(3, 3), fill="black"))
 
-    elif theme_name == "Space":
+    elif original_theme_name == "Space":
         # Spaceship logic
         # Commits are stars.
         dwg.defs.add(dwg.style("""
@@ -239,7 +239,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         # Beam eating a star?
         dwg.add(dwg.line(start=(ship_x, ship_y), end=(width, ship_y), stroke="#00a8ff", stroke_width=2, stroke_dasharray="4,2"))
 
-    elif theme_name == "Marvel":
+    elif original_theme_name == "Marvel":
         # Infinity Stones
         stones = ["#FFD700", "#FF0000", "#0000FF", "#800080", "#008000", "#FFA500"] # Mind, Reality, Space, Power, Time, Soul
         
@@ -289,6 +289,45 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         text_glow.feMerge(["coloredBlur", "SourceGraphic"])
         
         dwg.defs.add(text_glow)
+    elif original_theme_name == "Neural":
+        cx = width / 2
+        cy = height / 2 + 10
+
+        contributions = data.get("contributions", [])[-80:]
+        if not contributions:
+            return dwg.tostring()
+
+        nodes = []
+
+        # --- Brain core glow ---
+        dwg.add(dwg.circle(center=(cx, cy), r=45, fill="#00f7ff", opacity=0.08))
+        dwg.add(dwg.text(
+            "Contributions",
+            insert=(cx, cy + 5),
+            text_anchor="middle",
+            fill="#00f7ff",
+            font_size="12px",
+            font_family="Courier New",
+            opacity=0.8
+        ))
+
+        # --- Generate brain-shaped neuron positions ---
+        for i, day in enumerate(contributions):
+            count = day.get("count", 0)
+
+            # Hemisphere split
+            side = -1 if i % 2 == 0 else 1
+
+            # Organic brain ellipse
+            angle = random.uniform(0, math.pi)
+            radius_x = random.uniform(90, 150)
+            radius_y = random.uniform(60, 110)
+
+            # Distortion noise
+            noise = random.uniform(0.85, 1.15)
+
+            x = cx + side * math.cos(angle) * radius_x * noise
+            y = cy + math.sin(angle) * radius_y * noise
 
         # Glass Panel Gradient (Subtle diagonal)
         glass_grad = dwg.linearGradient(start=(0, 0), end=(1, 1), id="glassGrad")
