@@ -1,3 +1,5 @@
+import math
+import random
 import svgwrite
 from themes.styles import THEMES
 
@@ -28,7 +30,33 @@ def draw_stats_card(data, theme_name="Default", show_options=None, custom_colors
     # Background
     dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=10, ry=10, 
                      fill=theme["bg_color"], stroke=theme["border_color"], stroke_width=2))
-    
+    if theme_name == "Stranger_things":
+        # Floating particles in background
+        random.seed(42)
+        for i in range(12):
+            x = random.randint(20, width-20)
+            y = random.randint(20, height-20)
+            r = random.randint(1, 2)
+            dwg.add(dwg.circle(center=(x, y), r=r, fill="#ffffff", opacity=0.2))
+        
+        # Mini demogorgon in corner
+        demo_x = width - 40
+        demo_y = 35
+        dwg.add(dwg.circle(center=(demo_x, demo_y), r=12, fill="#330000", opacity=0.5))
+        
+        # Petals
+        for angle in range(0, 360, 60):
+            rad = math.radians(angle)
+            x1 = demo_x + 9 * math.cos(rad)
+            y1 = demo_y + 9 * math.sin(rad)
+            x2 = demo_x + 15 * math.cos(rad)
+            y2 = demo_y + 15 * math.sin(rad)
+            dwg.add(dwg.line(start=(x1, y1), end=(x2, y2), stroke="#ff0000", stroke_width=1, opacity=0.4))
+        
+        # Red glow around border
+        dwg.add(dwg.rect(insert=(2, 2), size=(width-4, height-4), rx=9, ry=9, 
+                        fill="none", stroke="#ff0000", stroke_width=1, opacity=0.3))
+
     # Title
     font_family = theme["font_family"]
     dwg.add(dwg.text(f"{data['username']}'s Stats", insert=(20, 35), 

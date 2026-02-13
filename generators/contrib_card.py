@@ -1,3 +1,4 @@
+import math
 import svgwrite
 import random
 from themes.styles import THEMES
@@ -112,6 +113,50 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             dwg.add(dwg.text(f"Stone {i+1}", insert=(sx, sy+30), fill="white", font_size=10, text_anchor="middle"))
             
         dwg.add(dwg.text("SNAP!", insert=(width-80, cy), fill=theme["title_color"], font_size=24, font_weight="bold", font_family="Impact"))
+    elif theme_name == "Stranger_things":
+        # Upside Down with demogorgon
+        # Floating particles
+        random.seed(42)
+        for i in range(15):
+            x = random.randint(20, width-20)
+            y = random.randint(40, height-20)
+            r = random.randint(1, 2)
+            dwg.add(dwg.circle(center=(x, y), r=r, fill="#ffffff", opacity=0.3))
+        
+        # Contribution grid with red glow
+        box_size = 10
+        gap = 2
+        start_x = 20
+        start_y = 55
+        
+        for col in range(30):
+            for row in range(5):
+                x = start_x + col * (box_size + gap)
+                y = start_y + row * (box_size + gap)
+                
+                level = random.choice([0, 1, 2, 3, 4])
+                colors = ["#1a1a1a", "#8b0000", "#b22222", "#dc143c", "#ff0000"]
+                fill = colors[level]
+                
+                dwg.add(dwg.rect(insert=(x, y), size=(box_size, box_size), fill=fill, rx=1, opacity=0.7))
+                
+                if level == 4:  # High activity - add glow
+                    dwg.add(dwg.rect(insert=(x-1, y-1), size=(box_size+2, box_size+2), 
+                                   fill="none", stroke="#ff0000", stroke_width=0.5, opacity=0.4))
+        
+        # Mini demogorgon silhouette
+        demo_x = width - 50
+        demo_y = height - 50
+        dwg.add(dwg.circle(center=(demo_x, demo_y), r=15, fill="#330000", opacity=0.6))
+        
+        # Petals
+        for angle in range(0, 360, 60):
+            rad = math.radians(angle)
+            x1 = demo_x + 12 * math.cos(rad)
+            y1 = demo_y + 12 * math.sin(rad)
+            x2 = demo_x + 20 * math.cos(rad)
+            y2 = demo_y + 20 * math.sin(rad)
+            dwg.add(dwg.line(start=(x1, y1), end=(x2, y2), stroke="#ff0000", stroke_width=1.5, opacity=0.5))
 
     else:
         # Default Grid (Github Style)
