@@ -1,6 +1,7 @@
 import streamlit as st  # type: ignore
 import base64
 import os
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from roast_widget_streamlit import render_roast_widget
 from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card
@@ -17,7 +18,7 @@ if "canvas" not in st.session_state:
     st.session_state["canvas"] = []
 
 for item in st.session_state["canvas"]:
-    st.markdown(item, unsafe_allow_html=True)
+    components.html(item, height=150)
 
 # Load environment variables
 load_dotenv()
