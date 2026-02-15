@@ -1,11 +1,23 @@
 import streamlit as st  # type: ignore
 import base64
 import os
-from dotenv import load_dotenv  # type: ignore
-from roast_widget_streamlit import render_roast_widget  # type: ignore
-from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card  # type: ignore
-from utils import github_api  # type: ignore
-from themes.styles import THEMES  # type: ignore
+from dotenv import load_dotenv
+from roast_widget_streamlit import render_roast_widget
+from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card
+from utils import github_api
+from themes.styles import THEMES
+from generators.visual_elements import (
+    emoji_element,
+    gif_element,
+    sticker_element
+)
+
+# Initialize canvas in session state
+if "canvas" not in st.session_state:
+    st.session_state["canvas"] = []
+
+for item in st.session_state["canvas"]:
+    st.markdown(item, unsafe_allow_html=True)
 
 # Load environment variables
 load_dotenv()
@@ -75,22 +87,23 @@ with st.sidebar:
         if custom_text != get_col("text_color"): custom_colors["text_color"] = custom_text
         if custom_border != get_col("border_color"): custom_colors["border_color"] = custom_border
 
+    github_token = st.text_input("GitHub Token (optional)", type="password", help="Enter your GitHub token to fetch contribution data")
+    
     if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
-    github_token = st.text_input("GitHub Token (optional)", type="password")
         
     st.info("💡 Tip: Use the 'Badges' tab to add your tech stack icons!")
 
 # Data Loading
 @st.cache_data
-def load_data(user):
-    d = github_api.get_live_github_data(user)
+def load_data(user, token=None):
+    d = github_api.get_live_github_data(user, token)
     if not d:
         st.warning("Using mock data (API limits).")
         d = github_api.get_mock_data(user)
     return d
 
-data = load_data(username if username else "torvalds")
+data = load_data(username if username else "torvalds", github_token if github_token else None)
 
 # Apply custom colors to current theme for python logic
 current_theme_opts = THEMES.get(selected_theme, THEMES["Default"]).copy()
@@ -98,7 +111,7 @@ if custom_colors:
     current_theme_opts.update(custom_colors)
 
 # --- Layout: Tabs ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity", "✨ Visual Elements"])
 
 def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
@@ -153,7 +166,7 @@ with tab1:
 
     show_ops = {"stars": show_stars, "commits": show_commits, "repos": show_repos, "followers": show_followers}
 
-    # Render
+    # Pass selected_theme string to support theme-specific logic (e.g. Glass)
     svg_bytes = stats_card.draw_stats_card(data, selected_theme, show_ops, custom_colors)
     render_tab(svg_bytes, "stats", username, selected_theme, custom_colors, hide_params=show_ops, code_template=f"[![{username}'s Stats]({{url}})](https://github.com/{{username}})")
 
@@ -175,7 +188,7 @@ with tab2:
     # Convert list to comma-separated string for URL generation
     excluded_languages_str = ",".join(excluded_languages) if excluded_languages else None
     
-    # Generate card with exclusions
+    # Generate card with exclusions - Pass selected_theme string
     svg_bytes = lang_card.draw_lang_card(data, selected_theme, custom_colors, excluded_languages=excluded_languages)
     render_tab(svg_bytes, "languages", username, selected_theme, custom_colors, code_template="![Top Langs]({url})", excluded_languages=excluded_languages_str)
 
@@ -185,7 +198,9 @@ with tab3:
     if selected_theme == "Gaming": st.caption("🐍 Snake Mode: The snake grows as it eats commits.")
     elif selected_theme == "Space": st.caption("🚀 Space Mode: Spaceship traversing the contribution galaxy.")
     elif selected_theme == "Marvel": st.caption("💎 Infinity Mode: Collecting Stones based on activity.")
+    elif selected_theme == "Glass": st.caption("💎 GlassMorphism: Translucent Glass based theme card.")
 
+    # Pass selected_theme string
     svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
     render_tab(svg_bytes, "contributions", username, selected_theme, custom_colors, code_template="![Contributions]({url})")
 
@@ -276,6 +291,7 @@ with tab6:
     with col1:
         st.caption("Theme: **{}**".format(selected_theme))
         try:
+            # Pass selected_theme string
             svg_bytes = recent_activity_card.draw_recent_activity_card({'username': username}, selected_theme, custom_colors, token=github_token)
         except Exception as e:
             st.error(f"Error rendering recent activity: {e}")
@@ -299,3 +315,27 @@ with tab6:
         url = f"https://gitcanvas-api.vercel.app/api/recent{query_str}&username={username}"
         code = f"![Recent Activity]({url})"
         show_code_area(code)
+
+with tab7:
+    st.subheader("✨ Visual Elements")
+    st.markdown("Add emojis, GIFs, or stickers to your canvas")
+
+    element_type = st.selectbox(
+        "Choose element type",
+        ["Emoji", "GIF", "Sticker"]
+    )
+
+    value = st.text_input(
+        "Enter value",
+        placeholder="🔥 or https://gif-url"
+    )
+
+    if st.button("Add to Canvas"):
+        if element_type == "Emoji":
+            svg = emoji_element(value)
+        elif element_type == "GIF":
+            svg = gif_element(value)
+        else:
+            svg = sticker_element(value)
+
+        st.session_state["canvas"].append(svg)

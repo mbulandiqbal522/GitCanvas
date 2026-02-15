@@ -13,8 +13,9 @@ if load_dotenv:
 
 
 
-def fetch_github_graphql(username):
-    token = os.getenv("GITHUB_TOKEN")
+def fetch_github_graphql(username, token=None):
+    if not token:
+        token = os.getenv("GITHUB_TOKEN")
     if not token:
         return None
 
@@ -83,7 +84,7 @@ def parse_graphql_contributions(graphql_json):
     return contributions, total_commits, contribution_weeks
 
 
-def get_github_headers():
+def get_github_headers(token=None):
     """
     Build headers for GitHub REST API requests.
     Uses Authorization header if GITHUB_TOKEN is set.
@@ -92,13 +93,14 @@ def get_github_headers():
         "Accept": "application/vnd.github+json"
     }
 
-    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        token = os.getenv("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
     return headers
 
-def get_live_github_data(username):
+def get_live_github_data(username, token=None):
     """
     Fetches real data from GitHub API. 
     Notes: 
@@ -109,7 +111,7 @@ def get_live_github_data(username):
     try:
         # User details
         user_url = f"https://api.github.com/users/{username}"
-        headers = get_github_headers()
+        headers = get_github_headers(token)
         user_resp = requests.get(user_url, headers=headers)
 
         if user_resp.status_code != 200:
@@ -159,7 +161,7 @@ def get_live_github_data(username):
         }
 
         # --- Optional GraphQL enrichment ---
-        graphql_data = fetch_github_graphql(username)
+        graphql_data = fetch_github_graphql(username, token)
         if graphql_data:
             try:
                 contributions, gql_total_commits, contribution_weeks = parse_graphql_contributions(graphql_data)
