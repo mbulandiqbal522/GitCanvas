@@ -1,11 +1,23 @@
 import streamlit as st  # type: ignore
 import base64
 import os
-from dotenv import load_dotenv  # type: ignore
-from roast_widget_streamlit import render_roast_widget  # type: ignore
-from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card  # type: ignore
-from utils import github_api  # type: ignore
-from themes.styles import THEMES  # type: ignore
+from dotenv import load_dotenv
+from roast_widget_streamlit import render_roast_widget
+from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card
+from utils import github_api
+from themes.styles import THEMES
+from generators.visual_elements import (
+    emoji_element,
+    gif_element,
+    sticker_element
+)
+
+# Initialize canvas in session state
+if "canvas" not in st.session_state:
+    st.session_state["canvas"] = []
+
+for item in st.session_state["canvas"]:
+    st.markdown(item, unsafe_allow_html=True)
 
 # Load environment variables
 load_dotenv()
@@ -98,7 +110,7 @@ if custom_colors:
     current_theme_opts.update(custom_colors)
 
 # --- Layout: Tabs ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity", "✨ Visual Elements"])
 
 def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
@@ -302,3 +314,27 @@ with tab6:
         url = f"https://gitcanvas-api.vercel.app/api/recent{query_str}&username={username}"
         code = f"![Recent Activity]({url})"
         show_code_area(code)
+
+with tab7:
+    st.subheader("✨ Visual Elements")
+    st.markdown("Add emojis, GIFs, or stickers to your canvas")
+
+    element_type = st.selectbox(
+        "Choose element type",
+        ["Emoji", "GIF", "Sticker"]
+    )
+
+    value = st.text_input(
+        "Enter value",
+        placeholder="🔥 or https://gif-url"
+    )
+
+    if st.button("Add to Canvas"):
+        if element_type == "Emoji":
+            svg = emoji_element(value)
+        elif element_type == "GIF":
+            svg = gif_element(value)
+        else:
+            svg = sticker_element(value)
+
+        st.session_state["canvas"].append(svg)
