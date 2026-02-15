@@ -12,13 +12,40 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     # Also save the original theme name string for comparison later
     original_theme_name = theme_name
     
+    
+    if isinstance(theme_name, dict):
+        # Already a theme dictionary (e.g., current_theme_opts from app.py)
+        theme = theme_name.copy()
+        # Restore the original name if possible, or just default to "Custom"
+        # Ideally, we should pass the name separately, but for now let's rely on the content
+        # If it's a dict, we can't easily get the name unless it's in the dict
+        # BUT, the errors are coming from theme_name == "Gaming" checks.
+        # If theme_name is a dict, those checks fail.
+        # We need to handle this.
+        # Let's assume passed theme is "Default" structure-wise if it's a dict, 
+        # unless we find a specific marker. 
+        # Actually, in app.py we pass `selected_theme` string now (step 129), 
+        # so this branch shouldn't be hit if we did it right?
+        # WAIT, in step 129 I changed it back to string:
+        # svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
+        # So theme_name IS a string.
+        pass
+    else:
+        # Convert theme_name string to actual theme dictionary
+        theme = THEMES.get(theme_name, THEMES["Default"]).copy()
+        
+    # Apply custom colors if provided
+    if custom_colors:
+        theme.update(custom_colors)
+        
+    width = 500
+    height = 150
+    
     # Allow a slightly larger playground for Gaming / Snake
     if theme_name == "Gaming":
         width = 560
         height = 180
-    else:
-        width = 500
-        height = 150
+    
     dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
     
     # Background
