@@ -1,23 +1,34 @@
 import svgwrite
 import random
 from themes.styles import THEMES
+import math
 
 def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     """
     Generates the Contribution Graph Card SVG.
     Supports 'Snake', 'Space', 'Marvel' visualization logic.
     """
-    theme = THEMES.get(theme_name, THEMES["Default"]).copy()
-    if custom_colors:
-        theme.update(custom_colors)
+    # FIXED: Handle both string theme name and pre-resolved theme dict
+    # Also save the original theme name string for comparison later
+    original_theme_name = theme_name
     
-    # Fake contribution data for visualization if not fully populated
-    # In a real scenario, data['contributions'] would have the last ~15-30 days or weeks
-    # For MVP we simulate a strip of activity
-    
+    if isinstance(theme_name, dict):
+        # Already a theme dictionary (e.g., current_theme_opts from app.py)
+        theme = theme_name.copy()
+        # Extract the theme name from the dict if it has one, otherwise default
+        original_theme_name = theme.get('_theme_name', 'Default')
+    else:
+        # Convert theme_name string to actual theme dictionary
+        theme = THEMES.get(theme_name, THEMES["Default"]).copy()
+        original_theme_name = theme_name
+        
+        # Apply custom colors if provided
+        if custom_colors:
+            theme.update(custom_colors)
+
     width = 500
     height = 150
-    dwg = svgwrite.Drawing(size=(f"{width}px", f"{height}px"))
+    dwg = svgwrite.Drawing(size=("100%", "100%"), viewBox=f"0 0 {width} {height}")
     
     # Background
     dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), rx=10, ry=10, 
@@ -26,12 +37,12 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
     # Title
     title = f"{data['username']}'s Contributions"
     dwg.add(dwg.text(title, insert=(20, 30), 
-                     fill=theme["title_color"], font_size=theme["title_font_size"], 
-                     font_family=theme["font_family"], font_weight="bold"))
+                     fill=theme["title_color"], font_size=theme.get("title_font_size", 18), 
+                     font_family=theme.get("font_family", "Arial"), font_weight="bold"))
     
-    # Theme Specific Logic
+    # Theme Specific Logic - use original_theme_name for string comparisons
     
-    if theme_name == "Gaming":
+    if original_theme_name == "Gaming":
         # SNAKE Logic: A winding path of green blocks
         # "Eating my contributions" -> The snake head is at the last commit
         
@@ -67,17 +78,37 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         dwg.add(dwg.rect(insert=(hx+3, hy+3), size=(3, 3), fill="black"))
         dwg.add(dwg.rect(insert=(hx+9, hy+3), size=(3, 3), fill="black"))
 
-    elif theme_name == "Space":
+    elif original_theme_name == "Space":
         # Spaceship logic
         # Commits are stars.
-        
-        # Draw random stars
-        for _ in range(30):
-            sx = random.randint(20, width-20)
-            sy = random.randint(50, height-20)
+        dwg.defs.add(dwg.style("""
+            @keyframes twinkle {
+            0%   { opacity: 0.3; }
+            50%  { opacity: 1; }
+            100% { opacity: 0.3; }
+            }
+
+            .star {
+            animation: twinkle 2s ease-in-out infinite;
+            }
+            """))
+
+        for i in range(30):
+            sx = random.randint(20, width - 20)
+            sy = random.randint(50, height - 20)
             r = random.uniform(1, 3)
-            dwg.add(dwg.circle(center=(sx, sy), r=r, fill="white", opacity=random.uniform(0.5, 1.0)))
-            
+            delay = random.uniform(0, 2)
+
+            star = dwg.circle(
+                center=(sx, sy),
+                r=r,
+                fill="white",
+                class_="star",
+                style=f"animation-delay: {delay}s"
+            )
+
+            dwg.add(star)
+
         # Draw Spaceship (Simple triangle)
         ship_x = width - 60
         ship_y = height / 2 + 10
@@ -90,7 +121,7 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
         # Beam eating a star?
         dwg.add(dwg.line(start=(ship_x, ship_y), end=(width, ship_y), stroke="#00a8ff", stroke_width=2, stroke_dasharray="4,2"))
 
-    elif theme_name == "Marvel":
+    elif original_theme_name == "Marvel":
         # Infinity Stones
         stones = ["#FFD700", "#FF0000", "#0000FF", "#800080", "#008000", "#FFA500"] # Mind, Reality, Space, Power, Time, Soul
         
@@ -112,6 +143,82 @@ def draw_contrib_card(data, theme_name="Default", custom_colors=None):
             dwg.add(dwg.text(f"Stone {i+1}", insert=(sx, sy+30), fill="white", font_size=10, text_anchor="middle"))
             
         dwg.add(dwg.text("SNAP!", insert=(width-80, cy), fill=theme["title_color"], font_size=24, font_weight="bold", font_family="Impact"))
+
+    elif original_theme_name == "Neural":
+        cx = width / 2
+        cy = height / 2 + 10
+
+        contributions = data.get("contributions", [])[-80:]
+        if not contributions:
+            return dwg.tostring()
+
+        nodes = []
+
+        # --- Brain core glow ---
+        dwg.add(dwg.circle(center=(cx, cy), r=45, fill="#00f7ff", opacity=0.08))
+        dwg.add(dwg.text(
+            "Contributions",
+            insert=(cx, cy + 5),
+            text_anchor="middle",
+            fill="#00f7ff",
+            font_size="12px",
+            font_family="Courier New",
+            opacity=0.8
+        ))
+
+        # --- Generate brain-shaped neuron positions ---
+        for i, day in enumerate(contributions):
+            count = day.get("count", 0)
+
+            # Hemisphere split
+            side = -1 if i % 2 == 0 else 1
+
+            # Organic brain ellipse
+            angle = random.uniform(0, math.pi)
+            radius_x = random.uniform(90, 150)
+            radius_y = random.uniform(60, 110)
+
+            # Distortion noise
+            noise = random.uniform(0.85, 1.15)
+
+            x = cx + side * math.cos(angle) * radius_x * noise
+            y = cy + math.sin(angle) * radius_y * noise
+
+            # Visual weight
+            size = 2 + min(count, 10)
+            brightness = min(255, 80 + count * 18)
+            color = f"rgb(0,{brightness},255)"
+
+            dwg.add(dwg.circle(
+                center=(x, y),
+                r=size,
+                fill=color,
+                opacity=0.9
+            ))
+
+            nodes.append((x, y, count))
+
+        # --- Synapse connections ---
+        for i in range(len(nodes)):
+            x1, y1, c1 = nodes[i]
+
+            # Each neuron connects to a few others
+            for _ in range(random.randint(2, 6)):
+                j = random.randint(0, len(nodes) - 1)
+                x2, y2, c2 = nodes[j]
+
+                dist = math.hypot(x2 - x1, y2 - y1)
+
+                if dist < 140:
+                    opacity = min((c1 + c2) / 20, 0.5)
+
+                    dwg.add(dwg.line(
+                        start=(x1, y1),
+                        end=(x2, y2),
+                        stroke="#00f7ff",
+                        stroke_width=1,
+                        opacity=opacity
+                    ))
 
     else:
         # Default Grid (Github Style)
