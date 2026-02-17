@@ -1,13 +1,23 @@
-import streamlit as st
+import streamlit as st  # type: ignore
 import base64
 import os
 from dotenv import load_dotenv
-import cairosvg
 from roast_widget_streamlit import render_roast_widget
-from generators import stats_card, lang_card, contrib_card, badge_generator, streak_card
-
+from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card
 from utils import github_api
 from themes.styles import THEMES
+from generators.visual_elements import (
+    emoji_element,
+    gif_element,
+    sticker_element
+)
+
+# Initialize canvas in session state
+if "canvas" not in st.session_state:
+    st.session_state["canvas"] = []
+
+for item in st.session_state["canvas"]:
+    st.markdown(item, unsafe_allow_html=True)
 
 # Load environment variables
 load_dotenv()
@@ -56,6 +66,8 @@ with st.sidebar:
     selected_theme = st.selectbox("Select Theme", list(THEMES.keys()))
     
     # Customization Expander
+    # Ensure custom_colors exists even if the expander isn't opened
+    custom_colors = {}
     with st.expander("Customize Colors", expanded=False):
         st.caption("Override theme defaults")
         default_theme = THEMES.get(selected_theme, THEMES["Default"]).copy() # Copy to avoid mutating global
@@ -75,6 +87,8 @@ with st.sidebar:
         if custom_text != get_col("text_color"): custom_colors["text_color"] = custom_text
         if custom_border != get_col("border_color"): custom_colors["border_color"] = custom_border
 
+    github_token = st.text_input("GitHub Token (optional)", type="password", help="Enter your GitHub token to fetch contribution data")
+    
     if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
         
@@ -82,14 +96,14 @@ with st.sidebar:
 
 # Data Loading
 @st.cache_data
-def load_data(user):
-    d = github_api.get_live_github_data(user)
+def load_data(user, token=None):
+    d = github_api.get_live_github_data(user, token)
     if not d:
         st.warning("Using mock data (API limits).")
         d = github_api.get_mock_data(user)
     return d
 
-data = load_data(username if username else "torvalds")
+data = load_data(username if username else "torvalds", github_token if github_token else None)
 
 # Apply custom colors to current theme for python logic
 current_theme_opts = THEMES.get(selected_theme, THEMES["Default"]).copy()
@@ -97,31 +111,43 @@ if custom_colors:
     current_theme_opts.update(custom_colors)
 
 # --- Layout: Tabs ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Main Stats", "Languages", "Contributions", "Streak", "Icons & Badges", "🔥 AI Roast"])
-
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity", "✨ Visual Elements"])
 
 def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
     st.text_area(label, value=code_content, height=100, label_visibility="collapsed")
 
-def render_tab(svg_bytes, endpoint, username, selected_theme, custom_colors, hide_params=None, code_template=None):
+def render_tab(svg_bytes, endpoint, username, selected_theme, custom_colors, hide_params=None, code_template=None, excluded_languages=None):
     col1, col2 = st.columns([1.5, 1])
     with col1:
         # Render SVG
         b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
         st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
 
-        # Convert SVG to PNG
-        png_bytes = cairosvg.svg2png(bytestring=svg_bytes.encode('utf-8'))
-
-        # Download PNG button
         st.download_button(
-            label="Download PNG",
-            data=png_bytes,
-            file_name=f"{endpoint}_{username}.png",
-            mime="image/png",
+            label="Download SVG",
+            data=svg_bytes.encode("utf-8"),
+            file_name=f"{endpoint}_{username}.svg",
+            mime="image/svg+xml",
             use_container_width=True
         )
+
+        png_bytes = None
+        try:
+            import cairosvg  # Local import to avoid startup crash if cairo libs are missing.
+            png_bytes = cairosvg.svg2png(bytestring=svg_bytes.encode("utf-8"))
+        except Exception:
+            png_bytes = None
+
+        if png_bytes:
+            # Download PNG button
+            st.download_button(
+                label="Download PNG",
+                data=png_bytes,
+                file_name=f"{endpoint}_{username}.png",
+                mime="image/png",
+                use_container_width=True
+            )
 
     with col2:
         st.subheader("Integration")
@@ -136,6 +162,11 @@ def render_tab(svg_bytes, endpoint, username, selected_theme, custom_colors, hid
             params.append(f"theme={selected_theme}")
         for k, v in custom_colors.items():
             params.append(f"{k}={v.replace('#', '')}")
+        
+        # Add exclude parameter for languages endpoint
+        if excluded_languages and endpoint == "languages":
+            # Remove spaces and add to params
+            params.append(f"exclude={excluded_languages.replace(' ', '')}")
 
         query_str = "&".join(params)
         if query_str:
@@ -160,14 +191,31 @@ with tab1:
 
     show_ops = {"stars": show_stars, "commits": show_commits, "repos": show_repos, "followers": show_followers}
 
-    # Render
+    # Pass selected_theme string to support theme-specific logic (e.g. Glass)
     svg_bytes = stats_card.draw_stats_card(data, selected_theme, show_ops, custom_colors)
     render_tab(svg_bytes, "stats", username, selected_theme, custom_colors, hide_params=show_ops, code_template=f"[![{username}'s Stats]({{url}})](https://github.com/{{username}})")
 
 with tab2:
     st.subheader("Top Languages")
-    svg_bytes = lang_card.draw_lang_card(data, selected_theme, custom_colors)
-    render_tab(svg_bytes, "languages", username, selected_theme, custom_colors, code_template="![Top Langs]({url})")
+    
+    # Get available languages from data
+    available_languages = [lang for lang, _ in data.get("top_languages", [])]
+    
+    # Use st.pills() for better UX - click to toggle, no dropdown to close
+    excluded_languages = st.pills(
+        "Languages to Exclude:",
+        options=available_languages,
+        default=[],
+        selection_mode="multi",
+        help="Click to toggle languages you want to hide from your stats"
+    )
+    
+    # Convert list to comma-separated string for URL generation
+    excluded_languages_str = ",".join(excluded_languages) if excluded_languages else None
+    
+    # Generate card with exclusions - Pass selected_theme string
+    svg_bytes = lang_card.draw_lang_card(data, selected_theme, custom_colors, excluded_languages=excluded_languages)
+    render_tab(svg_bytes, "languages", username, selected_theme, custom_colors, code_template="![Top Langs]({url})", excluded_languages=excluded_languages_str)
 
 with tab3:
     st.subheader("Contribution Graph")
@@ -176,7 +224,9 @@ with tab3:
     elif selected_theme == "Space": st.caption("🚀 Space Mode: Spaceship traversing the contribution galaxy.")
     elif selected_theme == "Marvel": st.caption("💎 Infinity Mode: Collecting Stones based on activity.")
     elif selected_theme == "Ocean": st.caption("🌊 Ocean Mode: Fish and bubbles swim through underwater contributions.")
+    elif selected_theme == "Glass": st.caption("💎 GlassMorphism: Translucent Glass based theme card.")
 
+    # Pass selected_theme string
     svg_bytes = contrib_card.draw_contrib_card(data, selected_theme, custom_colors)
     render_tab(svg_bytes, "contributions", username, selected_theme, custom_colors, code_template="![Contributions]({url})")
 
@@ -267,3 +317,60 @@ with tab6:
         render_roast_widget(username)
     else:
         st.warning("Please enter a GitHub username in the sidebar.")
+
+with tab6:
+    st.subheader("Recent Activity")
+    st.markdown("Shows your last 3 PR or Issue events from GitHub.")
+
+    col1, col2 = st.columns([1.5, 1])
+    with col1:
+        st.caption("Theme: **{}**".format(selected_theme))
+        try:
+            # Pass selected_theme string
+            svg_bytes = recent_activity_card.draw_recent_activity_card({'username': username}, selected_theme, custom_colors, token=github_token)
+        except Exception as e:
+            st.error(f"Error rendering recent activity: {e}")
+            svg_bytes = recent_activity_card._render_svg_lines([f"Error: {e}"], THEMES.get(selected_theme, THEMES['Default']))
+
+        b64 = base64.b64encode(svg_bytes.encode('utf-8')).decode("utf-8")
+        st.markdown(f'<img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 10px;"/>', unsafe_allow_html=True)
+
+    with col2:
+        st.subheader("Integration")
+        params = []
+        if selected_theme != "Default": params.append(f"theme={selected_theme}")
+        for k, v in custom_colors.items():
+            params.append(f"{k}={v.replace('#', '')}")
+        if github_token:
+            params.append(f"token={github_token}")
+
+        query_str = "&".join(params)
+        if query_str: query_str = "?" + query_str
+
+        url = f"https://gitcanvas-api.vercel.app/api/recent{query_str}&username={username}"
+        code = f"![Recent Activity]({url})"
+        show_code_area(code)
+
+with tab7:
+    st.subheader("✨ Visual Elements")
+    st.markdown("Add emojis, GIFs, or stickers to your canvas")
+
+    element_type = st.selectbox(
+        "Choose element type",
+        ["Emoji", "GIF", "Sticker"]
+    )
+
+    value = st.text_input(
+        "Enter value",
+        placeholder="🔥 or https://gif-url"
+    )
+
+    if st.button("Add to Canvas"):
+        if element_type == "Emoji":
+            svg = emoji_element(value)
+        elif element_type == "GIF":
+            svg = gif_element(value)
+        else:
+            svg = sticker_element(value)
+
+        st.session_state["canvas"].append(svg)
