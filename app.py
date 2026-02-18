@@ -232,6 +232,14 @@ with tab3:
     render_tab(svg_bytes, "contributions", username, selected_theme, custom_colors, code_template="![Contributions]({url})")
 
 with tab4:
+    st.subheader("GitHub Streak")
+    st.caption("🔥 Track your contribution streaks! Shows current consecutive days and your all-time longest streak.")
+    
+    svg_bytes = streak_card.draw_streak_card(data, selected_theme, custom_colors)
+    render_tab(svg_bytes, "streak", username, selected_theme, custom_colors, code_template="![GitHub Streak]({url})")
+
+with tab5:
+
     st.subheader("Tech Stack Badges")
     st.markdown("Click detailed settings to customize. Copy the code block to your README.")
     
@@ -301,8 +309,9 @@ with tab4:
             show_code_area(md_output, label="Badge Code")
 
 # NEW TAB 5: AI ROAST
-with tab5:
+with tab6:
     st.subheader("🔥 AI Profile Roast")
+
     st.markdown("Let AI roast your GitHub profile with humor!")
     
     if username:
