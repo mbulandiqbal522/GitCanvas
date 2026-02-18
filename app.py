@@ -4,7 +4,7 @@ import os
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from roast_widget_streamlit import render_roast_widget
-from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card
+from generators import stats_card, lang_card, contrib_card, badge_generator, recent_activity_card, streak_card
 from utils import github_api
 from themes.styles import THEMES
 from generators.visual_elements import (
@@ -112,7 +112,7 @@ if custom_colors:
     current_theme_opts.update(custom_colors)
 
 # --- Layout: Tabs ---
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Main Stats", "Languages", "Contributions", "Icons & Badges", "🔥 AI Roast", "Recent Activity", "✨ Visual Elements"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Main Stats", "Languages", "Contributions", "🔥 GitHub Streak", "Icons & Badges", "🔥 AI Roast", "Recent Activity", "✨ Visual Elements"])
 
 def show_code_area(code_content, label="Markdown Code"):
     st.markdown(f"**{label}** (Copy below)")
@@ -239,7 +239,6 @@ with tab4:
     render_tab(svg_bytes, "streak", username, selected_theme, custom_colors, code_template="![GitHub Streak]({url})")
 
 with tab5:
-
     st.subheader("Tech Stack Badges")
     st.markdown("Click detailed settings to customize. Copy the code block to your README.")
     
@@ -308,7 +307,7 @@ with tab5:
             st.markdown("---")
             show_code_area(md_output, label="Badge Code")
 
-# NEW TAB 5: AI ROAST
+# NEW TAB 6: AI ROAST
 with tab6:
     st.subheader("🔥 AI Profile Roast")
 
@@ -319,7 +318,7 @@ with tab6:
     else:
         st.warning("Please enter a GitHub username in the sidebar.")
 
-with tab6:
+with tab7:
     st.subheader("Recent Activity")
     st.markdown("Shows your last 3 PR or Issue events from GitHub.")
 
@@ -352,7 +351,7 @@ with tab6:
         code = f"![Recent Activity]({url})"
         show_code_area(code)
 
-with tab7:
+with tab8:
     st.subheader("✨ Visual Elements")
     st.markdown("Add emojis, GIFs, or stickers to your canvas")
 
