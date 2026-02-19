@@ -1,3 +1,12 @@
+✅ Step 1 — Create AI Module
+
+Create this file:
+
+ai/description_generator.py
+
+
+Add this code:
+
 # ai/description_generator.py
 
 import os
@@ -48,3 +57,38 @@ def generate_description(username, total_commits, top_language):
 
     except Exception as e:
         return f"Error generating description: {str(e)}"
+
+✅ Step 2 — Update app.py
+
+Add this import at the top:
+
+from ai.description_generator import generate_description
+
+
+Then add this inside the Streamlit UI section (after stats are calculated):
+
+if st.button("Generate AI Description"):
+    description = generate_description(
+        username,
+        total_commits,
+        top_language
+    )
+    st.subheader("AI Generated Summary")
+    st.write(description)
+
+✅ Step 3 — Add to README.md
+
+Add:
+
+## AI Integration
+
+This app now supports AI-generated descriptions of GitHub stats.
+
+To enable:
+1. Create a HuggingFace account
+2. Generate an API token
+3. Set environment variable:
+
+export HF_API_TOKEN=your_token_here
+
+4. Click "Generate AI Description" inside the app
